@@ -63,16 +63,33 @@ def draw_landmarks_on_image(rgb_image, detection_result):
     return annotated_image
 
 
-# Open the default camera
-cam = cv2.VideoCapture(0)
+# # Open the default camera
+# cam = cv2.VideoCapture(0)
 
-# Get the default frame width and height
+# # Get the default frame width and height
+# frame_width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+# frame_height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+# # Define the codec and create VideoWriter object
+# fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+# out = cv2.VideoWriter("output.mp4", fourcc, 20.0, (frame_width, frame_height))
+
+# 1. Open the video file
+video_path = "../videá/dom - Snepeda (360p, h264).mp4"
+cam = cv2.VideoCapture(video_path)
+
+if not cam.isOpened():
+    print("Error: Could not open video file.")
+    exit()
+
+# 2. Get properties from the source video for the output writer
 frame_width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = cam.get(cv2.CAP_PROP_FPS)  # Get original FPS
 
-# Define the codec and create VideoWriter object
+# 3. Define the codec and create VideoWriter object
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-out = cv2.VideoWriter("output.mp4", fourcc, 20.0, (frame_width, frame_height))
+out = cv2.VideoWriter("output_processed.mp4", fourcc, fps, (frame_width, frame_height))
 
 # STEP 2: Create HandLandmarker object once, before loop
 base_options = python.BaseOptions(model_asset_path="hand_landmarker.task")
