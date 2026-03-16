@@ -5,6 +5,7 @@ from mediapipe import framework
 
 
 class HandAnnotation:
+    """Handles hand landmark detection, visualization, and video recording."""
 
     MARGIN = 10  # pixels
     FONT_SIZE = 1
@@ -12,58 +13,50 @@ class HandAnnotation:
     HANDEDNESS_TEXT_COLOR = (88, 205, 54)  # vibrant green
 
     def __init__(self, cam):
-        # ================================ WEBCAM =====================================
-        # Open the default camera
-        # cam = cv2.VideoCapture(0)
+        """
+        Initialize the hand detector and video writer.
+
+        Args:
+            cam: OpenCV VideoCapture object.
+        """
         self.cam = cam
 
-        # Get the default frame width and height
+        # Get video properties for recording
         frame_width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        # Define the codec and create VideoWriter object
+        # Setup video codec and output file writer
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
         self.out = cv2.VideoWriter("output.mp4", fourcc, 20.0, (frame_width, frame_height))
-        # ================================ WEBCAM =====================================
 
-        # =============================== RECORDING ===================================
-        # # Open the video file
-        # video_path = "../videá/dom - Snepeda (360p, h264).mp4"
-        # cam = cv2.VideoCapture(video_path)
-
-        # if not cam.isOpened():
-        #     print("Error: Could not open video file.")
-        #     exit()
-
-        # # Get properties from the source video for the output writer
-        # frame_width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
-        # frame_height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        # fps = cam.get(cv2.CAP_PROP_FPS)  # Get original FPS
-
-        # # 3. Define the codec and create VideoWriter object
-        # fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        # out = cv2.VideoWriter("output_processed.mp4", fourcc, fps, (frame_width, frame_height))
-        # =============================== RECORDING ===================================
-
-        # Create HandLandmarker object once, before loop
-        # Path to the pre-trained AI model file
+        # Configure MediaPipe HandLandmarker
         base_options = mp.tasks.BaseOptions(model_asset_path="hand_landmarker.task")
-        # Configure AI behavior (model link + limit to 2 hands)
         options = mp.tasks.vision.HandLandmarkerOptions(base_options=base_options, num_hands=2)
-        # Initialize detector; loads model into memory
+
+        # Load the pre-trained hand landmarking model
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
 
-    def draw_landmarks_on_image(self, rgb_image, detection_result):
+    def drawLandmarksOnImage(self, rgb_image, detection_result):
+        """
+        Overlay detected landmarks and handedness labels onto the image.
+
+        Args:
+            rgb_image: Original image in RGB format.
+            detection_result: Data from MediaPipe detector.
+
+        Returns:
+            annotated_image: Image with visual feedback.
+        """
         hand_landmarks_list = detection_result.hand_landmarks
         handedness_list = detection_result.handedness
         annotated_image = np.copy(rgb_image)
 
-        # Loop through the detected hands to visualize.
+        # Iterate through each detected hand
         for idx in range(len(hand_landmarks_list)):
             hand_landmarks = hand_landmarks_list[idx]
             handedness = handedness_list[idx]
 
-            # Draw the hand landmarks.
+            # Convert landmarks to a format drawing_utils can use
             hand_landmarks_proto = framework.formats.landmark_pb2.NormalizedLandmarkList()
             hand_landmarks_proto.landmark.extend(
                 [
@@ -71,6 +64,8 @@ class HandAnnotation:
                     for landmark in hand_landmarks
                 ]
             )
+
+            # Draw skeletons and points
             mp.solutions.drawing_utils.draw_landmarks(
                 annotated_image,
                 hand_landmarks_proto,
@@ -79,14 +74,14 @@ class HandAnnotation:
                 mp.solutions.drawing_styles.get_default_hand_connections_style(),
             )
 
-            # Get the top left corner of the detected hand's bounding box.
+            # Calculate text position for handedness label (above the hand)
             height, width, _ = annotated_image.shape
             x_coordinates = [landmark.x for landmark in hand_landmarks]
             y_coordinates = [landmark.y for landmark in hand_landmarks]
             text_x = int(min(x_coordinates) * width)
             text_y = int(min(y_coordinates) * height) - self.MARGIN
 
-            # Draw handedness (left or right hand) on the image.
+            # Draw "Left" or "Right" text on the frame
             cv2.putText(
                 annotated_image,
                 f"{handedness[0].category_name}",
@@ -101,33 +96,50 @@ class HandAnnotation:
         return annotated_image
 
     def saveVideo(self):
-        # Release the capture and writer objects
+        """Release the VideoWriter resource and return the writer object."""
+        recording = self.out
         self.out.release()
+        return recording
 
     def processFrame(self):
+        """
+        Capture a single frame, run AI detection, and update the video file.
+
+        Returns:
+            annotated_frame: BGR image ready for display or None if capture fails.
+        """
         ret, frame = self.cam.read()
 
         if not ret:
             return None
 
-        # Convert to RGB
+        # MediaPipe requires RGB format, OpenCV uses BGR
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Convert to Mediapipe Image
+        # Wrap frame into MediaPipe Image object
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
-        # Detect
+        # Perform the actual hand tracking
         detection_result = self.detector.detect(image)
 
-        # Draw landmarks
-        annotated_image = self.draw_landmarks_on_image(image.numpy_view(), detection_result)
-        # cv2.imshow("Camera", cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
+        # Draw visual markers on the frame
+        annotated_image = self.drawLandmarksOnImage(image.numpy_view(), detection_result)
 
-        # Write to output file
-        self.out.write(cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
+        # Convert back to BGR to save and display via OpenCV/Qt
+        bgr_annotated = cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
+        self.out.write(bgr_annotated)
+
+        return bgr_annotated
+
+    def processSpecificFrame(self, frame):
+        """Processes a given frame instead of reading from self.cam."""
+        if frame is None:
+            return None
+
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+
+        detection_result = self.detector.detect(image)
+        annotated_image = self.drawLandmarksOnImage(image.numpy_view(), detection_result)
 
         return cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
-
-        # # Release the capture and writer objects
-        # cam.release()
-        # cv2.destroyAllWindows()
