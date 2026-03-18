@@ -56,41 +56,6 @@ class Window(QtWidgets.QWidget):
 
         self.setLayout(self.layout)  # type: ignore
 
-    def convertFrameToQtImage(self, rgbFrame):
-        """Convert an RGB OpenCV frame to Qt QImage format.
-
-        Args:
-            rgbFrame: RGB frame (numpy array) from OpenCV.
-
-        Returns:
-            QImage object in RGB format ready for Qt display.
-        """
-        return QtGui.QImage(  # type: ignore
-            rgbFrame,
-            rgbFrame.shape[1],
-            rgbFrame.shape[0],
-            rgbFrame.strides[0],
-            QtGui.QImage.Format.Format_RGB888,
-        )
-
-    def annotateFrame(self, frame):
-        """Process a single frame with hand detection and convert to Qt-compatible image format.
-
-        Args:
-            frame: Input BGR frame from OpenCV.
-
-        Returns:
-            QImage object in RGB format ready for display, or None if frame is invalid.
-        """
-        if frame is None:
-            return None
-
-        annotatedFrame = self.annotation.processSpecificFrame(frame)
-
-        # Convert OpenCV BGR format to RGB for Qt display
-        rgbFrame = cv2.cvtColor(annotatedFrame, cv2.COLOR_BGR2RGB)
-        return self.convertFrameToQtImage(rgbFrame)
-
     def setupCamera(self):
         """Initialize webcam capture, configure hand annotation processor, and start refresh timer."""
         self.capture = cv2.VideoCapture(0)
@@ -113,7 +78,7 @@ class Window(QtWidgets.QWidget):
         ret, frame = self.capture.read()
 
         if ret:
-            image = self.annotateFrame(frame)
+            image = self.annotation.annotateFrame(frame)
             if image is not None:
                 self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
 
@@ -180,7 +145,7 @@ class Window(QtWidgets.QWidget):
         if ret:
             # Convert BGR to RGB and display
             rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = self.convertFrameToQtImage(rgbFrame)
+            image = self.annotation.convertFrameToQtImage(rgbFrame)
             self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
 
 

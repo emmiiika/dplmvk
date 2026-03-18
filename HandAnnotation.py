@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import mediapipe as mp
 from mediapipe import framework
+from PySide6 import QtCore, QtWidgets, QtGui, QtMultimediaWidgets, QtMultimedia
+
 
 # ANSI escape codes for colored terminal output
 HEADER = "\033[95m"
@@ -47,7 +49,7 @@ class HandAnnotation:
         # Load the pre-trained hand landmarking model
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
 
-    def drawLandmarksOnImage(self, rgb_image, detection_result):
+    def drawLandmarksOnImage(self, rgbImage, detectionResult):
         """Overlay detected hand landmarks, connections, and handedness labels onto the image.
 
         This method draws skeletal connections between landmarks, individual landmark points,
@@ -60,9 +62,9 @@ class HandAnnotation:
         Returns:
             annotated_image: RGB image with visual overlays (numpy array).
         """
-        handLandmarksList = detection_result.hand_landmarks
-        handednessList = detection_result.handedness
-        annotatedImage = np.copy(rgb_image)
+        handLandmarksList = detectionResult.hand_landmarks
+        handednessList = detectionResult.handedness
+        annotatedImage = np.copy(rgbImage)
 
         # Iterate through each detected hand
         for idx in range(len(handLandmarksList)):
@@ -108,35 +110,6 @@ class HandAnnotation:
 
         return annotatedImage
 
-    def processFrame(self):
-        """Capture a single frame from the camera, run hand detection, annotate it, and save to video.
-
-        Returns:
-            annotated_frame: BGR image with annotations for display, or None if capture fails.
-        """
-        ret, frame = self.cam.read()
-
-        if not ret:
-            return None
-
-        # MediaPipe requires RGB format, OpenCV uses BGR
-        rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Wrap frame into MediaPipe Image object
-        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
-
-        # Perform the actual hand tracking
-        detectionResult = self.detector.detect(image)
-
-        # Draw landmarks and connections on the frame
-        annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
-
-        # Convert back to BGR to save and display via OpenCV/Qt
-        bgrAnnotated = cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
-        self.out.write(bgrAnnotated)
-
-        return bgrAnnotated
-
     def processSpecificFrame(self, frame):
         """Process a provided frame (instead of capturing from camera) for hand detection and annotation.
 
@@ -156,6 +129,41 @@ class HandAnnotation:
         annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
 
         return cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
+
+    def convertFrameToQtImage(self, rgbFrame):
+        """Convert an RGB OpenCV frame to Qt QImage format.
+
+        Args:
+            rgbFrame: RGB frame (numpy array) from OpenCV.
+
+        Returns:
+            QImage object in RGB format ready for Qt display.
+        """
+        return QtGui.QImage(  # type: ignore
+            rgbFrame,
+            rgbFrame.shape[1],
+            rgbFrame.shape[0],
+            rgbFrame.strides[0],
+            QtGui.QImage.Format.Format_RGB888,
+        )
+
+    def annotateFrame(self, frame):
+        """Process a single frame with hand detection and convert to Qt-compatible image format.
+
+        Args:
+            frame: Input BGR frame from OpenCV.
+
+        Returns:
+            QImage object in RGB format ready for display, or None if frame is invalid.
+        """
+        if frame is None:
+            return None
+
+        annotatedFrame = self.processSpecificFrame(frame)
+
+        # Convert OpenCV BGR format to RGB for Qt display
+        rgbFrame = cv2.cvtColor(annotatedFrame, cv2.COLOR_BGR2RGB)
+        return self.convertFrameToQtImage(rgbFrame)
 
     def createAnnotatedVideo(self, videoPath, outputPath):
         """
