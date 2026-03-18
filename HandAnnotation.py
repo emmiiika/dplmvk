@@ -3,6 +3,7 @@ import numpy as np
 import mediapipe as mp
 from mediapipe import framework
 
+# ANSI escape codes for colored terminal output
 HEADER = "\033[95m"
 BLUE = "\033[94m"
 GREEN = "\033[92m"
@@ -12,7 +13,7 @@ ENDC = "\033[0m"
 
 
 class HandAnnotation:
-    """Handles hand landmark detection, visualization, and video recording."""
+    """Handles hand landmark detection, visualization, and video recording using MediaPipe and OpenCV."""
 
     MARGIN = 10  # pixels
     FONT_SIZE = 1
@@ -24,75 +25,81 @@ class HandAnnotation:
         Initialize the hand detector and video writer.
 
         Args:
-            cam: OpenCV VideoCapture object.
+            cam: OpenCV VideoCapture object for accessing the camera feed.
+
+        Note:
+            This creates an 'output.mp4' file in the current directory for recording.
         """
         self.cam = cam
 
         # Get video properties for recording
-        frame_width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        frameWidth = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frameHeight = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         # Setup video codec and output file writer
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
-        self.out = cv2.VideoWriter("output.mp4", fourcc, 20.0, (frame_width, frame_height))
+        self.out = cv2.VideoWriter("output.mp4", fourcc, 20.0, (frameWidth, frameHeight))
 
         # Configure MediaPipe HandLandmarker
-        base_options = mp.tasks.BaseOptions(model_asset_path="hand_landmarker.task")
-        options = mp.tasks.vision.HandLandmarkerOptions(base_options=base_options, num_hands=2)
+        baseOptions = mp.tasks.BaseOptions(model_asset_path="hand_landmarker.task")
+        options = mp.tasks.vision.HandLandmarkerOptions(base_options=baseOptions, num_hands=2)
 
         # Load the pre-trained hand landmarking model
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
 
     def drawLandmarksOnImage(self, rgb_image, detection_result):
         """
-        Overlay detected landmarks and handedness labels onto the image.
+        Overlay detected hand landmarks, connections, and handedness labels onto the image.
+
+        This method draws skeletal connections between landmarks, individual landmark points,
+        and labels indicating left/right hand above each detected hand.
 
         Args:
-            rgb_image: Original image in RGB format.
-            detection_result: Data from MediaPipe detector.
+            rgb_image: Original image in RGB format (numpy array).
+            detection_result: MediaPipe HandLandmarker detection results containing landmarks and handedness.
 
         Returns:
-            annotated_image: Image with visual feedback.
+            annotated_image: RGB image with visual overlays (numpy array).
         """
-        hand_landmarks_list = detection_result.hand_landmarks
-        handedness_list = detection_result.handedness
-        annotated_image = np.copy(rgb_image)
+        handLandmarksList = detection_result.hand_landmarks
+        handednessList = detection_result.handedness
+        annotatedImage = np.copy(rgb_image)
 
         # Iterate through each detected hand
-        for idx in range(len(hand_landmarks_list)):
-            hand_landmarks = hand_landmarks_list[idx]
-            handedness = handedness_list[idx]
+        for idx in range(len(handLandmarksList)):
+            handLandmarks = handLandmarksList[idx]
+            handedness = handednessList[idx]
 
             # Convert landmarks to a format drawing_utils can use
-            hand_landmarks_proto = framework.formats.landmark_pb2.NormalizedLandmarkList()
-            hand_landmarks_proto.landmark.extend(
+            handLandmarksProto = framework.formats.landmark_pb2.NormalizedLandmarkList()
+            handLandmarksProto.landmark.extend(
                 [
                     framework.formats.landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z)
-                    for landmark in hand_landmarks
+                    for landmark in handLandmarks
                 ]
             )
 
             # Draw skeletons and points
             mp.solutions.drawing_utils.draw_landmarks(
-                annotated_image,
-                hand_landmarks_proto,
+                annotatedImage,
+                handLandmarksProto,
                 mp.solutions.hands.HAND_CONNECTIONS,
                 mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
                 mp.solutions.drawing_styles.get_default_hand_connections_style(),
             )
 
             # Calculate text position for handedness label (above the hand)
-            height, width, _ = annotated_image.shape
-            x_coordinates = [landmark.x for landmark in hand_landmarks]
-            y_coordinates = [landmark.y for landmark in hand_landmarks]
-            text_x = int(min(x_coordinates) * width)
-            text_y = int(min(y_coordinates) * height) - self.MARGIN
+            height, width, _ = annotatedImage.shape
+            xCoordinates = [landmark.x for landmark in handLandmarks]
+            yCoordinates = [landmark.y for landmark in handLandmarks]
+            textX = int(min(xCoordinates) * width)
+            textY = int(min(yCoordinates) * height) - self.MARGIN
 
             # Draw "Left" or "Right" text on the frame
             cv2.putText(
-                annotated_image,
+                annotatedImage,
                 f"{handedness[0].category_name}",
-                (text_x, text_y),
+                (textX, textY),
                 cv2.FONT_HERSHEY_DUPLEX,
                 self.FONT_SIZE,
                 self.HANDEDNESS_TEXT_COLOR,
@@ -100,20 +107,14 @@ class HandAnnotation:
                 cv2.LINE_AA,
             )
 
-        return annotated_image
-
-    def saveVideo(self):
-        """Release the VideoWriter resource and return the writer object."""
-        recording = self.out
-        self.out.release()
-        return recording
+        return annotatedImage
 
     def processFrame(self):
         """
-        Capture a single frame, run AI detection, and update the video file.
+        Capture a single frame from the camera, run hand detection, annotate it, and save to video.
 
         Returns:
-            annotated_frame: BGR image ready for display or None if capture fails.
+            annotated_frame: BGR image with annotations for display, or None if capture fails.
         """
         ret, frame = self.cam.read()
 
@@ -121,37 +122,58 @@ class HandAnnotation:
             return None
 
         # MediaPipe requires RGB format, OpenCV uses BGR
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Wrap frame into MediaPipe Image object
-        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
 
         # Perform the actual hand tracking
-        detection_result = self.detector.detect(image)
+        detectionResult = self.detector.detect(image)
 
         # Draw visual markers on the frame
-        annotated_image = self.drawLandmarksOnImage(image.numpy_view(), detection_result)
+        annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
 
         # Convert back to BGR to save and display via OpenCV/Qt
-        bgr_annotated = cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
-        self.out.write(bgr_annotated)
+        bgrAnnotated = cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
+        self.out.write(bgrAnnotated)
 
-        return bgr_annotated
+        return bgrAnnotated
 
     def processSpecificFrame(self, frame):
-        """Processes a given frame instead of reading from self.cam."""
+        """
+        Process a provided frame (instead of capturing from camera) for hand detection and annotation.
+
+        Args:
+            frame: Input BGR image (numpy array) to process.
+
+        Returns:
+            annotated_frame: BGR image with hand annotations, or None if frame is invalid.
+        """
         if frame is None:
             return None
 
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+        rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
 
-        detection_result = self.detector.detect(image)
-        annotated_image = self.drawLandmarksOnImage(image.numpy_view(), detection_result)
+        detectionResult = self.detector.detect(image)
+        annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
 
-        return cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
+        return cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
 
     def createAnnotatedVideo(self, videoPath, outputPath):
+        """
+        Create an annotated video from an input video file by processing each frame.
+
+        Reads frames from the input video, applies hand detection and annotation,
+        and writes the result to a new output video file.
+
+        Args:
+            videoPath: Path to the input video file (string).
+            outputPath: Path for the output annotated video file (string).
+
+        Returns:
+            annotated_video: OpenCV VideoCapture object for the output video, or None on failure.
+        """
         print(f"Creating annotated video from {HEADER}'{videoPath}'{ENDC} at '{HEADER}{outputPath}{ENDC}'.")
         video = cv2.VideoCapture(videoPath)
         width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -172,7 +194,6 @@ class HandAnnotation:
         if not out.isOpened():
             print(f"{FAIL}Could not open VideoWriter.{ENDC}")
 
-            exit(1)
             return None
         else:
             print(f"{GREEN}VideoWriter opened successfully.{ENDC}")
