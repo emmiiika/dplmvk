@@ -5,6 +5,8 @@ from HandAnnotation import HandAnnotation
 import numpy as np
 import os
 import random
+from Scoring import Scoring
+
 
 # ANSI escape codes for colored terminal output
 HEADER = "\033[95m"
@@ -140,6 +142,8 @@ class Window(QtWidgets.QWidget):
 
         self.referenceVideo = self.annotateReferenceVideo(referenceVideoPath)
 
+        self.scoring = Scoring(self.referenceVideo, self.capture)
+
         print(f"{GREEN}✓{ENDC} Reference video loaded from '{referenceVideoPath}'.")
 
         return referenceVideoPath
@@ -172,6 +176,12 @@ class Window(QtWidgets.QWidget):
             rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image = self.annotation.convertFrameToQtImage(rgbFrame)
             self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
+
+    def updateScore(self):
+        """Update the score display label with the given score value."""
+
+        currentScore = self.scoring.calculateScore(self.annotation)  # Calculate the score based on current annotation
+        self.score.setText(f"Score: {currentScore:.2f}%")
 
 
 if __name__ == "__main__":

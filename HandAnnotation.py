@@ -49,29 +49,18 @@ class HandAnnotation:
         # Load the pre-trained hand landmarking model
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
 
-    def drawLandmarksOnImage(self, rgbImage, detectionResult):
-        """Overlay detected hand landmarks, connections, and handedness labels onto the image.
+        self.handLandmarksList = []  # Store detected hand landmarks for external access
 
-        This method draws skeletal connections between landmarks, individual landmark points,
-        and labels indicating left/right hand above each detected hand.
+    def getHandLandmarks(self):
+        """Return the list of detected hand landmarks from the most recent detection result."""
+        return self.handLandmarksList
 
-        Args:
-            rgb_image: Original image in RGB format (numpy array).
-            detection_result: MediaPipe HandLandmarker detection results containing landmarks and handedness.
-
-        Returns:
-            annotated_image: RGB image with visual overlays (numpy array).
-        """
+    def extractHandLandmarkProtos(self, detectionResult):
+        """Convert MediaPipe detection landmarks into NormalizedLandmarkList protos for drawing."""
         handLandmarksList = detectionResult.hand_landmarks
-        handednessList = detectionResult.handedness
-        annotatedImage = np.copy(rgbImage)
+        protos = []
 
-        # Iterate through each detected hand
-        for idx in range(len(handLandmarksList)):
-            handLandmarks = handLandmarksList[idx]
-            handedness = handednessList[idx]
-
-            # Convert landmarks to a format drawing_utils can use
+        for handLandmarks in handLandmarksList:
             handLandmarksProto = framework.formats.landmark_pb2.NormalizedLandmarkList()
             handLandmarksProto.landmark.extend(
                 [
@@ -79,8 +68,22 @@ class HandAnnotation:
                     for landmark in handLandmarks
                 ]
             )
+            protos.append(handLandmarksProto)
 
-            # Draw skeletons and landmark points
+        return protos
+
+    def drawLandmarksOnImage(self, rgbImage, detectionResult):
+        """Overlay detected hand landmarks, connections, and handedness labels onto the image."""
+        self.handLandmarksList = detectionResult.hand_landmarks
+        handednessList = detectionResult.handedness
+        annotatedImage = np.copy(rgbImage)
+
+        handProtos = self.extractHandLandmarkProtos(detectionResult)
+
+        # Iterate through each detected hand
+        for idx, handLandmarksProto in enumerate(handProtos):
+            handedness = handednessList[idx]
+
             mp.solutions.drawing_utils.draw_landmarks(
                 annotatedImage,
                 handLandmarksProto,
@@ -91,6 +94,7 @@ class HandAnnotation:
 
             # Calculate text position for handedness label (above the hand)
             height, width, _ = annotatedImage.shape
+            handLandmarks = self.handLandmarksList[idx]
             xCoordinates = [landmark.x for landmark in handLandmarks]
             yCoordinates = [landmark.y for landmark in handLandmarks]
             textX = int(min(xCoordinates) * width)
