@@ -48,13 +48,30 @@ class Window(QtWidgets.QWidget):
         self.gestureVideo = QtWidgets.QLabel()
         self.gestureVideo.setFixedSize(self.gestureVideoSize)
 
-        # Organize widgets into a grid
+        # Organize widgets into a grid layout
         self.layout = QtWidgets.QGridLayout()  # type: ignore
         self.layout.addWidget(self.webcam, 1, 0, QtCore.Qt.AlignmentFlag.AlignCenter)  # type: ignore
         self.layout.addWidget(self.score, 2, 1, QtCore.Qt.AlignmentFlag.AlignCenter)  # type: ignore
         self.layout.addWidget(self.gestureVideo, 1, 2, QtCore.Qt.AlignmentFlag.AlignCenter)  # type: ignore
 
         self.setLayout(self.layout)  # type: ignore
+
+    def convertFrameToQtImage(self, rgbFrame):
+        """Convert an RGB OpenCV frame to Qt QImage format.
+
+        Args:
+            rgbFrame: RGB frame (numpy array) from OpenCV.
+
+        Returns:
+            QImage object in RGB format ready for Qt display.
+        """
+        return QtGui.QImage(  # type: ignore
+            rgbFrame,
+            rgbFrame.shape[1],
+            rgbFrame.shape[0],
+            rgbFrame.strides[0],
+            QtGui.QImage.Format.Format_RGB888,
+        )
 
     def annotateFrame(self, frame):
         """Process a single frame with hand detection and convert to Qt-compatible image format.
@@ -65,20 +82,14 @@ class Window(QtWidgets.QWidget):
         Returns:
             QImage object in RGB format ready for display, or None if frame is invalid.
         """
-        image = None
-        if frame is not None:
-            frame = self.annotation.processSpecificFrame(frame)
+        if frame is None:
+            return None
 
-            # Convert OpenCV BGR format to RGB for Qt display
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = QtGui.QImage(  # type: ignore
-                frame,
-                frame.shape[1],
-                frame.shape[0],
-                frame.strides[0],
-                QtGui.QImage.Format.Format_RGB888,
-            )
-        return image
+        annotatedFrame = self.annotation.processSpecificFrame(frame)
+
+        # Convert OpenCV BGR format to RGB for Qt display
+        rgbFrame = cv2.cvtColor(annotatedFrame, cv2.COLOR_BGR2RGB)
+        return self.convertFrameToQtImage(rgbFrame)
 
     def setupCamera(self):
         """Initialize webcam capture, configure hand annotation processor, and start refresh timer."""
@@ -97,12 +108,14 @@ class Window(QtWidgets.QWidget):
     def displayVideoStream(self):
         """Capture a frame from the webcam, annotate it with hand landmarks, and display in the UI.
 
-        Called periodically by the camera timer. Updates the webcam label with the annotated frame.
+        Called periodically by the camera timer (~33 FPS). Updates the webcam label with the annotated frame.
         """
-        _, frame = self.capture.read()
+        ret, frame = self.capture.read()
 
-        image = self.annotateFrame(frame)
-        self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
+        if ret:
+            image = self.annotateFrame(frame)
+            if image is not None:
+                self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
 
     def annotateReferenceVideo(self, referenceVideoPath):
         """Process and cache an annotated version of the reference video.
@@ -119,11 +132,13 @@ class Window(QtWidgets.QWidget):
         Note:
             Annotated videos are saved with '_annotated' suffix in the same directory.
         """
+
+        # Generate output path by inserting '_annotated' before file extension
         inputPath = referenceVideoPath.split(".")
         outputPath = ".." + inputPath[-2] + "_annotated." + inputPath[-1]
 
         if os.path.isfile(outputPath):
-            print(f"Reference video {HEADER}already exists{ENDC}, loading the existing one.")
+            print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
 
             return cv2.VideoCapture(outputPath)
 
@@ -151,26 +166,21 @@ class Window(QtWidgets.QWidget):
         self.refTimer.start(30)  # Cca 30 FPS
 
     def displayReferenceVideo(self):
-        """Display the next frame from the reference video, looping when the end is reached.
+        """Display the next frame from the reference video, looping from the start when finished.
 
         Restarts from frame 0 when the video finishes. Converts from OpenCV BGR to Qt RGB format
         before displaying.
         """
-        _, frame = self.referenceVideo.read()
+        ret, frame = self.referenceVideo.read()
 
-        if not _:
+        if not ret:
             self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            _, frame = self.referenceVideo.read()
+            ret, frame = self.referenceVideo.read()
 
-        else:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = QtGui.QImage(  # type: ignore
-                frame,
-                frame.shape[1],
-                frame.shape[0],
-                frame.strides[0],
-                QtGui.QImage.Format.Format_RGB888,
-            )
+        if ret:
+            # Convert BGR to RGB and display
+            rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = self.convertFrameToQtImage(rgbFrame)
             self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
 
 

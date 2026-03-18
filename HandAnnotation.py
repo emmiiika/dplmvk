@@ -48,8 +48,7 @@ class HandAnnotation:
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
 
     def drawLandmarksOnImage(self, rgb_image, detection_result):
-        """
-        Overlay detected hand landmarks, connections, and handedness labels onto the image.
+        """Overlay detected hand landmarks, connections, and handedness labels onto the image.
 
         This method draws skeletal connections between landmarks, individual landmark points,
         and labels indicating left/right hand above each detected hand.
@@ -79,7 +78,7 @@ class HandAnnotation:
                 ]
             )
 
-            # Draw skeletons and points
+            # Draw skeletons and landmark points
             mp.solutions.drawing_utils.draw_landmarks(
                 annotatedImage,
                 handLandmarksProto,
@@ -95,7 +94,7 @@ class HandAnnotation:
             textX = int(min(xCoordinates) * width)
             textY = int(min(yCoordinates) * height) - self.MARGIN
 
-            # Draw "Left" or "Right" text on the frame
+            # Draw "Left" or "Right" text label above the hand
             cv2.putText(
                 annotatedImage,
                 f"{handedness[0].category_name}",
@@ -110,8 +109,7 @@ class HandAnnotation:
         return annotatedImage
 
     def processFrame(self):
-        """
-        Capture a single frame from the camera, run hand detection, annotate it, and save to video.
+        """Capture a single frame from the camera, run hand detection, annotate it, and save to video.
 
         Returns:
             annotated_frame: BGR image with annotations for display, or None if capture fails.
@@ -130,7 +128,7 @@ class HandAnnotation:
         # Perform the actual hand tracking
         detectionResult = self.detector.detect(image)
 
-        # Draw visual markers on the frame
+        # Draw landmarks and connections on the frame
         annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
 
         # Convert back to BGR to save and display via OpenCV/Qt
@@ -140,8 +138,7 @@ class HandAnnotation:
         return bgrAnnotated
 
     def processSpecificFrame(self, frame):
-        """
-        Process a provided frame (instead of capturing from camera) for hand detection and annotation.
+        """Process a provided frame (instead of capturing from camera) for hand detection and annotation.
 
         Args:
             frame: Input BGR image (numpy array) to process.
@@ -180,29 +177,25 @@ class HandAnnotation:
         height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = video.get(cv2.CAP_PROP_FPS)
 
+        # Initialize VideoWriter with MP4 codec at original FPS
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
-
         out = cv2.VideoWriter(outputPath, fourcc, fps, (width, height))
 
         if not video.isOpened():
-            print(f"{FAIL}Could not open video at '{videoPath}'{ENDC}")
-
+            print(f"{FAIL}Error: Could not open video at '{videoPath}'{ENDC}")
             return None
-        else:
-            print(f"{GREEN}Video opened successfully from '{videoPath}'{ENDC}")
+        print(f"{GREEN}✓ Video opened successfully from '{videoPath}'{ENDC}")
 
         if not out.isOpened():
-            print(f"{FAIL}Could not open VideoWriter.{ENDC}")
-
+            print(f"{FAIL}Error: Could not initialize VideoWriter.{ENDC}")
+            video.release()
             return None
-        else:
-            print(f"{GREEN}VideoWriter opened successfully.{ENDC}")
+        print(f"{GREEN}✓ VideoWriter initialized successfully.{ENDC}")
 
         framesProcessed = 0
         ret, frame = video.read()
         while ret:
             annotated = self.processSpecificFrame(frame)
-            out.write(annotated)
 
             if annotated is not None:
                 out.write(annotated)
@@ -215,5 +208,5 @@ class HandAnnotation:
 
         self.annotatedVideo = cv2.VideoCapture(outputPath)
 
-        print(f"{BLUE}Created annotated video with {ENDC}{framesProcessed}{BLUE} processed frames.{ENDC}")
+        print(f"{BLUE}✓ Annotated video created with {ENDC}{framesProcessed}{BLUE} processed frames.{ENDC}")
         return self.annotatedVideo
