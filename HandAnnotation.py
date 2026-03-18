@@ -190,15 +190,15 @@ class HandAnnotation:
         out = cv2.VideoWriter(outputPath, fourcc, fps, (width, height))
 
         if not video.isOpened():
-            print(f"{FAIL}Error: Could not open video at '{videoPath}'{ENDC}")
+            print(f"{FAIL}Error{ENDC}: Could not open video at '{videoPath}'.")
             return None
-        print(f"{GREEN}✓ Video opened successfully from '{videoPath}'{ENDC}")
+        print(f"{GREEN}✓{ENDC} Video opened successfully from '{videoPath}'.")
 
         if not out.isOpened():
-            print(f"{FAIL}Error: Could not initialize VideoWriter.{ENDC}")
+            print(f"{FAIL}Error{ENDC}: Could not initialize VideoWriter.")
             video.release()
             return None
-        print(f"{GREEN}✓ VideoWriter initialized successfully.{ENDC}")
+        print(f"{GREEN}✓{ENDC} VideoWriter initialized successfully.")
 
         framesProcessed = 0
         ret, frame = video.read()
@@ -216,5 +216,5 @@ class HandAnnotation:
 
         self.annotatedVideo = cv2.VideoCapture(outputPath)
 
-        print(f"{BLUE}✓ Annotated video created with {ENDC}{framesProcessed}{BLUE} processed frames.{ENDC}")
+        print(f"{GREEN}✓{ENDC} Annotated video created with {framesProcessed} processed frames.")
         return self.annotatedVideo

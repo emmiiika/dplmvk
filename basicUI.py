@@ -4,6 +4,7 @@ import cv2
 from HandAnnotation import HandAnnotation
 import numpy as np
 import os
+import random
 
 # ANSI escape codes for colored terminal output
 HEADER = "\033[95m"
@@ -12,6 +13,9 @@ GREEN = "\033[92m"
 WARNING = "\033[93m"
 FAIL = "\033[91m"
 ENDC = "\033[0m"
+
+FOLDER = "../videa/"  # Path to the folder containing reference videos
+ANNOTATED_FOLDER = "../videa/.annotated/"  # Path to save annotated reference videos
 
 
 # Main application window class for gesture recognition and video playback
@@ -32,6 +36,8 @@ class Window(QtWidgets.QWidget):
         self.setupUi()
         self.setupCamera()
         self.setupPlayer()
+
+        os.makedirs(ANNOTATED_FOLDER, exist_ok=True)
 
     def setupUi(self):
         """Initialize and arrange UI widgets using a grid layout."""
@@ -56,6 +62,8 @@ class Window(QtWidgets.QWidget):
 
         self.setLayout(self.layout)  # type: ignore
 
+        print(f"{GREEN}✓{ENDC} UI setup complete.")
+
     def setupCamera(self):
         """Initialize webcam capture, configure hand annotation processor, and start refresh timer."""
         self.capture = cv2.VideoCapture(0)
@@ -69,6 +77,8 @@ class Window(QtWidgets.QWidget):
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.displayVideoStream)
         self.timer.start(30)
+
+        print(f"{GREEN}✓{ENDC} Camera setup complete.")
 
     def displayVideoStream(self):
         """Capture a frame from the webcam, annotate it with hand landmarks, and display in the UI.
@@ -95,16 +105,16 @@ class Window(QtWidgets.QWidget):
             cv2.VideoCapture object pointing to the annotated reference video (existing or newly created).
 
         Note:
-            Annotated videos are saved with '_annotated' suffix in the same directory.
+            Annotated videos are saved with '_annotated' suffix in the ANNOTATED_FOLDER.
         """
 
         # Generate output path by inserting '_annotated' before file extension
-        inputPath = referenceVideoPath.split(".")
-        outputPath = ".." + inputPath[-2] + "_annotated." + inputPath[-1]
+        filename = os.path.basename(referenceVideoPath)
+        basename, ext = os.path.splitext(filename)
+        outputPath = os.path.join(ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
 
         if os.path.isfile(outputPath):
             print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
-
             return cv2.VideoCapture(outputPath)
 
         return self.annotation.createAnnotatedVideo(referenceVideoPath, outputPath)
@@ -114,10 +124,23 @@ class Window(QtWidgets.QWidget):
 
         Returns:
             Path to the reference video file."""
-        referenceVideoPath = "../videa/dom - Snepeda (360p, h264).mp4"
+
+        if not os.path.exists(FOLDER) or not os.path.isdir(FOLDER):
+            print(f"{FAIL}Error{ENDC}: folder does not exist or is not a directory: {FOLDER}")
+
+            return None
+
+        referenceVideosList = os.listdir(FOLDER)
+
+        idx = referenceVideosList.index(".annotated")
+        referenceVideosList.pop(idx)
+
+        randomVideo = random.choice(referenceVideosList)
+        referenceVideoPath = os.path.join(FOLDER, randomVideo)
+
         self.referenceVideo = self.annotateReferenceVideo(referenceVideoPath)
 
-        print(f"{GREEN}Reference video loaded from '{referenceVideoPath}'{ENDC}.")
+        print(f"{GREEN}✓{ENDC} Reference video loaded from '{referenceVideoPath}'.")
 
         return referenceVideoPath
 
@@ -129,6 +152,8 @@ class Window(QtWidgets.QWidget):
         self.refTimer = QtCore.QTimer()
         self.refTimer.timeout.connect(self.displayReferenceVideo)
         self.refTimer.start(30)  # Cca 30 FPS
+
+        print(f"{GREEN}✓{ENDC} Player setup complete.")
 
     def displayReferenceVideo(self):
         """Display the next frame from the reference video, looping from the start when finished.
