@@ -3,6 +3,14 @@ from PySide6 import QtCore, QtWidgets, QtGui, QtMultimediaWidgets, QtMultimedia
 import cv2
 from HandAnnotation import HandAnnotation
 import numpy as np
+import os
+
+HEADER = "\033[95m"
+BLUE = "\033[94m"
+GREEN = "\033[92m"
+WARNING = "\033[93m"
+FAIL = "\033[91m"
+ENDC = "\033[0m"
 
 
 # Main application window class for gesture recognition and video playback
@@ -82,24 +90,26 @@ class Window(QtWidgets.QWidget):
         image = self.annotateFrame(frame)
         self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
 
+    def annotateReferenceVideo(self, referenceVideoPath):
+        """Annotate and return the reference video."""
+        inputPath = referenceVideoPath.split(".")
+        outputPath = ".." + inputPath[-2] + "_annotated." + inputPath[-1]
+
+        if os.path.isfile(outputPath):
+            print(f"Reference video {HEADER}already exists{ENDC}, loading the existing one.")
+
+            return cv2.VideoCapture(outputPath)
+
+        return self.annotation.createAnnotatedVideo(referenceVideoPath, outputPath)
+
     def loadReferenceVideo(self):
+        """Load and annotated the reference video."""
         referenceVideoPath = "../videa/dom - Snepeda (360p, h264).mp4"
-        self.referenceVideo = cv2.VideoCapture(referenceVideoPath)
+        self.referenceVideo = self.annotateReferenceVideo(referenceVideoPath)
+
+        print(f"{GREEN}Reference video loaded from '{referenceVideoPath}'{ENDC}.")
 
         return referenceVideoPath
-
-    def annotateReferenceVideo(self):
-        """Read, annotate and display one frame of the reference video."""
-        ret, frame = self.referenceVideo.read()
-        if not ret:  # TODO redo so it loads already annotated video, not reannotating
-            # Loop video: restart from the beginning if it ends
-            self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            ret, frame = self.referenceVideo.read()
-
-        if ret:
-            image = self.annotateFrame(frame)
-            if image:
-                self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
 
     def setupPlayer(self):
         """Initialize the reference video capture and start the animation timer."""
@@ -112,10 +122,25 @@ class Window(QtWidgets.QWidget):
 
     def displayReferenceVideo(self):
         """Process each camera frame, apply annotations, and update the UI label."""
+        # print("Displaying reference video.")
         _, frame = self.referenceVideo.read()
 
-        image = self.annotateFrame(frame)
-        self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
+        if not _:
+            self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            _, frame = self.referenceVideo.read()
+
+        else:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = QtGui.QImage(  # type: ignore
+                frame,
+                frame.shape[1],
+                frame.shape[0],
+                frame.strides[0],
+                QtGui.QImage.Format.Format_RGB888,
+            )
+            self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
+
+        # print(f"{GREEN}Reference video displayed.{ENDC}")
 
     def saveVideo(self):
         """Trigger the video saving process in the annotation module."""

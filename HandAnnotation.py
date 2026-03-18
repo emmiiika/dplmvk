@@ -3,6 +3,13 @@ import numpy as np
 import mediapipe as mp
 from mediapipe import framework
 
+HEADER = "\033[95m"
+BLUE = "\033[94m"
+GREEN = "\033[92m"
+WARNING = "\033[93m"
+FAIL = "\033[91m"
+ENDC = "\033[0m"
+
 
 class HandAnnotation:
     """Handles hand landmark detection, visualization, and video recording."""
@@ -143,3 +150,49 @@ class HandAnnotation:
         annotated_image = self.drawLandmarksOnImage(image.numpy_view(), detection_result)
 
         return cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
+
+    def createAnnotatedVideo(self, videoPath, outputPath):
+        print(f"Creating annotated video from {HEADER}'{videoPath}'{ENDC} at '{HEADER}{outputPath}{ENDC}'.")
+        video = cv2.VideoCapture(videoPath)
+        width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = video.get(cv2.CAP_PROP_FPS)
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
+
+        out = cv2.VideoWriter(outputPath, fourcc, fps, (width, height))
+
+        if not video.isOpened():
+            print(f"{FAIL}Could not open video at '{videoPath}'{ENDC}")
+
+            return None
+        else:
+            print(f"{GREEN}Video opened successfully from '{videoPath}'{ENDC}")
+
+        if not out.isOpened():
+            print(f"{FAIL}Could not open VideoWriter.{ENDC}")
+
+            exit(1)
+            return None
+        else:
+            print(f"{GREEN}VideoWriter opened successfully.{ENDC}")
+
+        framesProcessed = 0
+        ret, frame = video.read()
+        while ret:
+            annotated = self.processSpecificFrame(frame)
+            out.write(annotated)
+
+            if annotated is not None:
+                out.write(annotated)
+                framesProcessed += 1
+
+            ret, frame = video.read()
+
+        video.release()
+        out.release()
+
+        self.annotatedVideo = cv2.VideoCapture(outputPath)
+
+        print(f"{BLUE}Created annotated video with {ENDC}{framesProcessed}{BLUE} processed frames.{ENDC}")
+        return self.annotatedVideo
