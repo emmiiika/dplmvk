@@ -73,7 +73,7 @@ class Window(QtWidgets.QWidget):
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.videoSize.height())
 
         # Initialize hand detection and annotation logic
-        self.annotation = HandAnnotation(self.capture)
+        self.webcamAnnotation = HandAnnotation(self.capture)
 
         # Setup timer to refresh the video feed at ~33 FPS
         self.timer = QtCore.QTimer()
@@ -90,7 +90,7 @@ class Window(QtWidgets.QWidget):
         ret, frame = self.capture.read()
 
         if ret:
-            image = self.annotation.annotateFrame(frame)
+            image = self.webcamAnnotation.processSpecificFrame(frame, returnQt=True)
             if image is not None:
                 self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
 
@@ -119,7 +119,7 @@ class Window(QtWidgets.QWidget):
             print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
             return cv2.VideoCapture(outputPath)
 
-        return self.annotation.createAnnotatedVideo(referenceVideoPath, outputPath)
+        return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)
 
     def loadReferenceVideo(self):
         """Load the reference gesture video from a path.
@@ -132,6 +132,7 @@ class Window(QtWidgets.QWidget):
 
             return None
 
+        # Choose a random video from the folder, ignoring any already annotated videos
         referenceVideosList = os.listdir(FOLDER)
 
         idx = referenceVideosList.index(".annotated")
@@ -140,9 +141,12 @@ class Window(QtWidgets.QWidget):
         randomVideo = random.choice(referenceVideosList)
         referenceVideoPath = os.path.join(FOLDER, randomVideo)
 
+        # Process the reference video to create an annotated version (or load from cache if it already exists)
+        nonAnnotatedVideo = cv2.VideoCapture(referenceVideoPath)
+        self.referenceAnnotation = HandAnnotation(nonAnnotatedVideo)
         self.referenceVideo = self.annotateReferenceVideo(referenceVideoPath)
 
-        self.scoring = Scoring(self.referenceVideo, self.capture)
+        self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation)
 
         print(f"{GREEN}✓{ENDC} Reference video loaded from '{referenceVideoPath}'.")
 
@@ -168,19 +172,21 @@ class Window(QtWidgets.QWidget):
         ret, frame = self.referenceVideo.read()
 
         if not ret:
+            self.updateScore()  # Update the score display when the reference video finishes
+
             self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = self.referenceVideo.read()
 
         if ret:
             # Convert BGR to RGB and display
             rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = self.annotation.convertFrameToQtImage(rgbFrame)
+            image = self.referenceAnnotation.convertFrameToQtImage(rgbFrame)
             self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
 
     def updateScore(self):
         """Update the score display label with the given score value."""
 
-        currentScore = self.scoring.calculateScore(self.annotation)  # Calculate the score based on current annotation
+        currentScore = self.scoring.calculateScore()  # Calculate the score based on current annotation
         self.score.setText(f"Score: {currentScore:.2f}%")
 
 
@@ -191,5 +197,7 @@ if __name__ == "__main__":
     widget = Window()
     widget.resize(1000, 600)
     widget.show()
+
+    print(f"{GREEN}✓{ENDC} Application initialized successfully.")
 
     sys.exit(app.exec())

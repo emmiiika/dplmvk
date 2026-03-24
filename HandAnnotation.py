@@ -3,6 +3,8 @@ import numpy as np
 import mediapipe as mp
 from mediapipe import framework
 from PySide6 import QtCore, QtWidgets, QtGui, QtMultimediaWidgets, QtMultimedia
+import os
+import copy
 
 
 # ANSI escape codes for colored terminal output
@@ -21,22 +23,23 @@ class HandAnnotation:
     FONT_SIZE = 1
     FONT_THICKNESS = 1
     HANDEDNESS_TEXT_COLOR = (88, 205, 54)  # vibrant green
+    SAMPLINGRATE = 0.05  # seconds (20 FPS)
 
-    def __init__(self, cam):
+    def __init__(self, videoInput):
         """
         Initialize the hand detector and video writer.
 
         Args:
-            cam: OpenCV VideoCapture object for accessing the camera feed.
+            videoInput: OpenCV VideoCapture object for accessing the video feed.
 
         Note:
             This creates an 'output.mp4' file in the current directory for recording.
         """
-        self.cam = cam
+        self.cam = videoInput
 
         # Get video properties for recording
-        frameWidth = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frameHeight = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        frameWidth = int(videoInput.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frameHeight = int(videoInput.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         # Setup video codec and output file writer
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
@@ -50,6 +53,7 @@ class HandAnnotation:
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
 
         self.handLandmarksList = []  # Store detected hand landmarks for external access
+        self.handLandmarksTimestamped = []  # Store timestamped hand landmarks
 
     def getHandLandmarks(self):
         """Return the list of detected hand landmarks from the most recent detection result."""
@@ -114,26 +118,6 @@ class HandAnnotation:
 
         return annotatedImage
 
-    def processSpecificFrame(self, frame):
-        """Process a provided frame (instead of capturing from camera) for hand detection and annotation.
-
-        Args:
-            frame: Input BGR image (numpy array) to process.
-
-        Returns:
-            annotated_frame: BGR image with hand annotations, or None if frame is invalid.
-        """
-        if frame is None:
-            return None
-
-        rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
-
-        detectionResult = self.detector.detect(image)
-        annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
-
-        return cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
-
     def convertFrameToQtImage(self, rgbFrame):
         """Convert an RGB OpenCV frame to Qt QImage format.
 
@@ -151,23 +135,47 @@ class HandAnnotation:
             QtGui.QImage.Format.Format_RGB888,
         )
 
-    def annotateFrame(self, frame):
-        """Process a single frame with hand detection and convert to Qt-compatible image format.
+    def processSpecificFrame(self, frame, returnQt=False):
+        """Process a provided frame (instead of capturing from camera) for hand detection and annotation.
 
         Args:
-            frame: Input BGR frame from OpenCV.
+            frame: Input BGR image (numpy array) to process.
+            returnQt: If True, return a Qt QImage; otherwise, return BGR image.
 
         Returns:
-            QImage object in RGB format ready for display, or None if frame is invalid.
+            annotated_frame: BGR image with hand annotations if returnQt=False, or QImage if returnQt=True, or None if frame is invalid.
         """
         if frame is None:
             return None
 
-        annotatedFrame = self.processSpecificFrame(frame)
+        rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
 
-        # Convert OpenCV BGR format to RGB for Qt display
-        rgbFrame = cv2.cvtColor(annotatedFrame, cv2.COLOR_BGR2RGB)
-        return self.convertFrameToQtImage(rgbFrame)
+        detectionResult = self.detector.detect(image)
+        annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
+
+        if returnQt:
+            return self.convertFrameToQtImage(annotatedImage)
+        else:
+            return cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
+
+    def saveLandmarksToFile(self, outputPath):
+        """Save the detected hand landmarks to a text file for later analysis.
+
+        Args:
+            outputPath: Path to the annotated video file (string).
+        """
+        # Preserve base path and replace extension with _handLandmarks.txt
+        base, _ = os.path.splitext(outputPath)
+        filePath = f"{base}_handLandmarks.txt"
+
+        with open(filePath, "a") as f:
+            for timestamp, handLandmarks in self.handLandmarksTimestamped:
+                f.write(f"time={timestamp:.3f}\n")
+                for hand in handLandmarks:
+                    for landmark in hand:
+                        f.write(f"{landmark.x}, {landmark.y}, {landmark.z}\n")
+                f.write("\n\n")  # Separate hands with two blank lines
 
     def createAnnotatedVideo(self, videoPath, outputPath):
         """
@@ -188,6 +196,7 @@ class HandAnnotation:
         width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = video.get(cv2.CAP_PROP_FPS)
+        frameIdx = 0
 
         # Initialize VideoWriter with MP4 codec at original FPS
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
@@ -205,6 +214,8 @@ class HandAnnotation:
         print(f"{GREEN}✓{ENDC} VideoWriter initialized successfully.")
 
         framesProcessed = 0
+        self.handLandmarksTimestamped = []  # Reset for new video
+        nextSampleTime = 0.0  # Sample at 20 FPS (every 0.05 seconds)
         ret, frame = video.read()
         while ret:
             annotated = self.processSpecificFrame(frame)
@@ -213,10 +224,19 @@ class HandAnnotation:
                 out.write(annotated)
                 framesProcessed += 1
 
+            timestampSeconds = frameIdx / fps
+            if timestampSeconds >= nextSampleTime:
+                self.handLandmarksTimestamped.append([timestampSeconds, copy.deepcopy(self.handLandmarksList)])
+                nextSampleTime += self.SAMPLINGRATE
+
+            frameIdx += 1
+
             ret, frame = video.read()
 
         video.release()
         out.release()
+
+        self.saveLandmarksToFile(outputPath)  # Save landmarks to a text file alongside the video
 
         self.annotatedVideo = cv2.VideoCapture(outputPath)
 
