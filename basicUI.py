@@ -6,6 +6,7 @@ import numpy as np
 import os
 import random
 from Scoring import Scoring
+import time
 
 
 # ANSI escape codes for colored terminal output
@@ -16,9 +17,6 @@ WARNING = "\033[93m"
 FAIL = "\033[91m"
 ENDC = "\033[0m"
 
-FOLDER = "../videa/"  # Path to the folder containing reference videos
-ANNOTATED_FOLDER = "../videa/.annotated/"  # Path to save annotated reference videos
-
 
 # Main application window class for gesture recognition and video playback
 class Window(QtWidgets.QWidget):
@@ -28,6 +26,10 @@ class Window(QtWidgets.QWidget):
     Uses PySide6 for UI components and OpenCV for frame capture and annotation.
     """
 
+    FOLDER = "../videa/"  # Path to the folder containing reference videos
+    ANNOTATED_FOLDER = "../videa/.annotated/"  # Path to save annotated reference videos
+    SAMPLING_RATE = 0.05  # seconds (20 FPS) for collecting user landmarks during tracking
+
     def __init__(self):
         """Initialize the main application window with video dimensions and UI components, trigger setup methods."""
         super().__init__()
@@ -35,11 +37,17 @@ class Window(QtWidgets.QWidget):
         self.videoSize = QtCore.QSize(768, 576)
         self.gestureVideoSize = QtCore.QSize(640, 480)
 
+        # Tracking state for user movement comparison
+        self.isTracking = False
+        self.startTime = 0.0
+        self.nextSampleTime = 0.0
+        self.userLandmarksTimestamped = []
+
         self.setupUi()
         self.setupCamera()
         self.setupPlayer()
 
-        os.makedirs(ANNOTATED_FOLDER, exist_ok=True)
+        os.makedirs(self.ANNOTATED_FOLDER, exist_ok=True)
 
     def setupUi(self):
         """Initialize and arrange UI widgets using a grid layout."""
@@ -86,6 +94,7 @@ class Window(QtWidgets.QWidget):
         """Capture a frame from the webcam, annotate it with hand landmarks, and display in the UI.
 
         Called periodically by the camera timer (~33 FPS). Updates the webcam label with the annotated frame.
+        Collects user landmarks for scoring when tracking is active.
         """
         ret, frame = self.capture.read()
 
@@ -93,6 +102,14 @@ class Window(QtWidgets.QWidget):
             image = self.webcamAnnotation.processSpecificFrame(frame, returnQt=True)
             if image is not None:
                 self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
+
+            # Collect user landmarks at 20 FPS when tracking is active
+            if self.isTracking:
+                timestamp = time.time() - self.startTime
+                if timestamp >= self.nextSampleTime:
+                    # Store landmarks in dictionary format (x, y, z only)
+                    self.userLandmarksTimestamped.append((timestamp, self.webcamAnnotation.handLandmarksList))
+                    self.nextSampleTime += self.SAMPLING_RATE  # Sample at 20 FPS (every 0.05 seconds)
 
     def annotateReferenceVideo(self, referenceVideoPath):
         """Process and cache an annotated version of the reference video.
@@ -113,10 +130,11 @@ class Window(QtWidgets.QWidget):
         # Generate output path by inserting '_annotated' before file extension
         filename = os.path.basename(referenceVideoPath)
         basename, ext = os.path.splitext(filename)
-        outputPath = os.path.join(ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
+        outputPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
 
         if os.path.isfile(outputPath):
             print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
+
             return cv2.VideoCapture(outputPath)
 
         return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)
@@ -127,19 +145,19 @@ class Window(QtWidgets.QWidget):
         Returns:
             Path to the reference video file."""
 
-        if not os.path.exists(FOLDER) or not os.path.isdir(FOLDER):
-            print(f"{FAIL}Error{ENDC}: folder does not exist or is not a directory: {FOLDER}")
+        if not os.path.exists(self.FOLDER) or not os.path.isdir(self.FOLDER):
+            print(f"{FAIL}Error{ENDC}: folder does not exist or is not a directory: {self.FOLDER}")
 
             return None
 
         # Choose a random video from the folder, ignoring any already annotated videos
-        referenceVideosList = os.listdir(FOLDER)
+        referenceVideosList = os.listdir(self.FOLDER)
 
         idx = referenceVideosList.index(".annotated")
         referenceVideosList.pop(idx)
 
         randomVideo = random.choice(referenceVideosList)
-        referenceVideoPath = os.path.join(FOLDER, randomVideo)
+        referenceVideoPath = os.path.join(self.FOLDER, randomVideo)
 
         # Process the reference video to create an annotated version (or load from cache if it already exists)
         nonAnnotatedVideo = cv2.VideoCapture(referenceVideoPath)
@@ -172,12 +190,23 @@ class Window(QtWidgets.QWidget):
         ret, frame = self.referenceVideo.read()
 
         if not ret:
+            self.isTracking = False  # Stop tracking when video ends
+            print(f"{HEADER}Stop tracking.{ENDC}")
             self.updateScore()  # Update the score display when the reference video finishes
 
             self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = self.referenceVideo.read()
 
         if ret:
+            if not self.isTracking:
+                # Start tracking when the reference video begins playing
+                self.isTracking = True
+                print(f"{HEADER}Start tracking.{ENDC}")
+
+                self.startTime = time.time()
+                self.nextSampleTime = 0.0
+                self.userLandmarksTimestamped = []
+
             # Convert BGR to RGB and display
             rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image = self.referenceAnnotation.convertFrameToQtImage(rgbFrame)
@@ -186,7 +215,9 @@ class Window(QtWidgets.QWidget):
     def updateScore(self):
         """Update the score display label with the given score value."""
 
-        currentScore = self.scoring.calculateScore()  # Calculate the score based on current annotation
+        currentScore = self.scoring.calculateScore(
+            self.userLandmarksTimestamped
+        )  # Calculate the score based on user landmarks during tracking
         self.score.setText(f"Score: {currentScore:.2f}%")
 
 

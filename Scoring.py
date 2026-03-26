@@ -7,14 +7,26 @@ class Scoring:
         self.webcamAnnotation = webcamAnnotation
         self.referenceAnnotation = referenceAnnotation
 
-    def calculateScore(self):
+    def calculateScore(self, user_landmarks=None):
+        print(
+            f"Calculating score, user_landmarks: {len(user_landmarks) if user_landmarks else 0}, reference_landmarks: {len(self.referenceAnnotation.handLandmarksTimestamped)}"
+        )
 
-        webcamHandLandmarks = self.webcamAnnotation.getHandLandmarks()
-        referenceHandLandmarks = self.referenceAnnotation.getHandLandmarks()
-        # print(webcamHandLandmarks)
-        # print(referenceHandLandmarks)
+        if user_landmarks is None:
+            # Fallback to current landmarks if no sequence provided
+            webcamHandLandmarks = self.webcamAnnotation.getHandLandmarks()
+            referenceHandLandmarks = self.referenceAnnotation.getHandLandmarks()
+            # Placeholder for single-frame scoring
+            score = 0.0
+            return score
 
-        # Placeholder for actual scoring logic
+        # Compare timestamped sequences
+        reference_landmarks = self.referenceAnnotation.handLandmarksTimestamped
+        # Implement sequence comparison logic here
+        # For now, placeholder
         score = 0.0
-        # Implement scoring algorithm here
+
+        print(user_landmarks)
+        # print(reference_landmarks)
+
         return score

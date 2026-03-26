@@ -4,7 +4,7 @@ import mediapipe as mp
 from mediapipe import framework
 from PySide6 import QtCore, QtWidgets, QtGui, QtMultimediaWidgets, QtMultimedia
 import os
-import copy
+import json
 
 
 # ANSI escape codes for colored terminal output
@@ -23,7 +23,7 @@ class HandAnnotation:
     FONT_SIZE = 1
     FONT_THICKNESS = 1
     HANDEDNESS_TEXT_COLOR = (88, 205, 54)  # vibrant green
-    SAMPLINGRATE = 0.05  # seconds (20 FPS)
+    SAMPLING_RATE = 0.05  # seconds (20 FPS)
 
     def __init__(self, videoInput):
         """
@@ -59,6 +59,10 @@ class HandAnnotation:
         """Return the list of detected hand landmarks from the most recent detection result."""
         return self.handLandmarksList
 
+    def setHandLandmarks(self, handLandmarksList):
+        """Set the list of detected hand landmarks."""
+        self.handLandmarksList = handLandmarksList
+
     def extractHandLandmarkProtos(self, detectionResult):
         """Convert MediaPipe detection landmarks into NormalizedLandmarkList protos for drawing."""
         handLandmarksList = detectionResult.hand_landmarks
@@ -79,6 +83,8 @@ class HandAnnotation:
     def drawLandmarksOnImage(self, rgbImage, detectionResult):
         """Overlay detected hand landmarks, connections, and handedness labels onto the image."""
         self.handLandmarksList = detectionResult.hand_landmarks
+        # Convert to dictionary format for consistency
+        self.handLandmarksList = self._landmarksToDict(self.handLandmarksList)
         handednessList = detectionResult.handedness
         annotatedImage = np.copy(rgbImage)
 
@@ -99,8 +105,8 @@ class HandAnnotation:
             # Calculate text position for handedness label (above the hand)
             height, width, _ = annotatedImage.shape
             handLandmarks = self.handLandmarksList[idx]
-            xCoordinates = [landmark.x for landmark in handLandmarks]
-            yCoordinates = [landmark.y for landmark in handLandmarks]
+            xCoordinates = [landmark["x"] for landmark in handLandmarks]
+            yCoordinates = [landmark["y"] for landmark in handLandmarks]
             textX = int(min(xCoordinates) * width)
             textY = int(min(yCoordinates) * height) - self.MARGIN
 
@@ -160,22 +166,78 @@ class HandAnnotation:
             return cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
 
     def saveLandmarksToFile(self, outputPath):
-        """Save the detected hand landmarks to a text file for later analysis.
+        """Save the detected hand landmarks to a JSON file for later analysis and easy loading.
 
         Args:
             outputPath: Path to the annotated video file (string).
         """
-        # Preserve base path and replace extension with _handLandmarks.txt
+        # Preserve base path and replace extension with _handLandmarks.json
         base, _ = os.path.splitext(outputPath)
-        filePath = f"{base}_handLandmarks.txt"
+        filePath = f"{base}_handLandmarks.json"
 
-        with open(filePath, "a") as f:
-            for timestamp, handLandmarks in self.handLandmarksTimestamped:
-                f.write(f"time={timestamp:.3f}\n")
-                for hand in handLandmarks:
-                    for landmark in hand:
-                        f.write(f"{landmark.x}, {landmark.y}, {landmark.z}\n")
-                f.write("\n\n")  # Separate hands with two blank lines
+        # Convert landmarks to a serializable format
+        landmarksData = []
+        for timestamp, handLandmarks in self.handLandmarksTimestamped:
+            # Flatten all hands into one list of landmark dicts
+            allLandmarks = []
+            for hand in handLandmarks:
+                allLandmarks.extend(hand)
+            frameData = {"timestamp": round(timestamp, 3), "landmarks": allLandmarks}
+            landmarksData.append(frameData)
+
+        # Save to JSON file
+        with open(filePath, "w") as f:
+            json.dump(landmarksData, f, indent=2)
+        print(f"{GREEN}✓{ENDC} Landmarks saved to '{filePath}'")
+
+    def _landmarksToDict(self, handLandmarksList):
+        """Convert hand landmarks to dictionary format (x, y, z coordinates only).
+
+        Args:
+            handLandmarksList: List of lists of Landmark objects or NormalizedLandmark objects.
+
+        Returns:
+            List of lists of dictionaries with x, y, z keys.
+        """
+        handLandmarksDict = []
+        for hand in handLandmarksList:
+            handData = [{"x": landmark.x, "y": landmark.y, "z": landmark.z} for landmark in hand]
+            handLandmarksDict.append(handData)
+        return handLandmarksDict
+
+    def loadLandmarksFromFile(self, filePath):
+        """Load timestamped hand landmarks from a JSON file.
+
+        Args:
+            filePath: Path to the JSON landmark file.
+
+        Returns:
+            List of tuples (timestamp, handLandmarks) or None if file doesn't exist.
+        """
+        if not os.path.exists(filePath):
+            print(f"{FAIL}Error{ENDC}: Landmark file not found at '{filePath}'.")
+            return None
+
+        try:
+            with open(filePath, "r") as f:
+                landmarksData = json.load(f)
+
+            # Convert back to (timestamp, handLandmarks) tuples
+            self.handLandmarksTimestamped = []
+            for frameData in landmarksData:
+                timestamp = frameData["timestamp"]
+                # Flatten landmarks are stored as one hand
+                hands = [frameData["landmarks"]]
+                self.handLandmarksTimestamped.append((timestamp, hands))
+
+            print(f"{GREEN}✓{ENDC} Loaded {len(self.handLandmarksTimestamped)} frames from '{filePath}'")
+            return self.handLandmarksTimestamped
+        except json.JSONDecodeError as e:
+            print(f"{FAIL}Error{ENDC}: Failed to parse JSON file: {e}")
+            return None
+        except Exception as e:
+            print(f"{FAIL}Error{ENDC}: Failed to load landmarks: {e}")
+            return None
 
     def createAnnotatedVideo(self, videoPath, outputPath):
         """
@@ -226,8 +288,9 @@ class HandAnnotation:
 
             timestampSeconds = frameIdx / fps
             if timestampSeconds >= nextSampleTime:
-                self.handLandmarksTimestamped.append([timestampSeconds, copy.deepcopy(self.handLandmarksList)])
-                nextSampleTime += self.SAMPLINGRATE
+                # Store landmarks in dictionary format (x, y, z only)
+                self.handLandmarksTimestamped.append([timestampSeconds, self.handLandmarksList])
+                nextSampleTime += self.SAMPLING_RATE
 
             frameIdx += 1
 
