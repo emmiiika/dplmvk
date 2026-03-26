@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import mediapipe as mp
+import mediapipe as mp  # type: ignore
 from mediapipe import framework
 from PySide6 import QtCore, QtWidgets, QtGui, QtMultimediaWidgets, QtMultimedia
 import os

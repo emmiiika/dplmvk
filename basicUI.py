@@ -7,6 +7,8 @@ import os
 import random
 from Scoring import Scoring
 import time
+import json
+import copy
 
 
 # ANSI escape codes for colored terminal output
@@ -42,6 +44,10 @@ class Window(QtWidgets.QWidget):
         self.startTime = 0.0
         self.nextSampleTime = 0.0
         self.userLandmarksTimestamped = []
+
+        # Pause between reference video loops (seconds)
+        self.referenceVideoLoopPause = 3.0
+        self.referenceVideoPauseUntil = 0.0
 
         self.setupUi()
         self.setupCamera()
@@ -103,13 +109,14 @@ class Window(QtWidgets.QWidget):
             if image is not None:
                 self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
 
-            # Collect user landmarks at 20 FPS when tracking is active
+            # Collect user landmarks at the configured sampling rate when tracking is active
             if self.isTracking:
                 timestamp = time.time() - self.startTime
                 if timestamp >= self.nextSampleTime:
-                    # Store landmarks in dictionary format (x, y, z only)
-                    self.userLandmarksTimestamped.append((timestamp, self.webcamAnnotation.handLandmarksList))
-                    self.nextSampleTime += self.SAMPLING_RATE  # Sample at 20 FPS (every 0.05 seconds)
+                    self.userLandmarksTimestamped.append(
+                        (timestamp, copy.deepcopy(self.webcamAnnotation.handLandmarksList))
+                    )
+                    self.nextSampleTime += self.SAMPLING_RATE  # use the constant rate for sampling
 
     def annotateReferenceVideo(self, referenceVideoPath):
         """Process and cache an annotated version of the reference video.
@@ -181,21 +188,45 @@ class Window(QtWidgets.QWidget):
 
         print(f"{GREEN}✓{ENDC} Player setup complete.")
 
+    def saveUserLandmarks(self):
+        """Save the collected webcam landmark sequence to a JSON file."""
+        if not self.userLandmarksTimestamped:
+            print(f"{WARNING}Warning{ENDC}: No user landmarks recorded, skipping save.")
+            return
+
+        os.makedirs(self.ANNOTATED_FOLDER, exist_ok=True)
+        outFile = os.path.join(self.ANNOTATED_FOLDER, "webcam_userLandmarks.json")
+
+        userData = []
+        for timestamp, landmarks in self.userLandmarksTimestamped:
+            userData.append({"timestamp": round(timestamp, 3), "landmarks": landmarks})
+
+        with open(outFile, "w") as f:
+            json.dump(userData, f, indent=2)
+
+        print(f"{GREEN}✓{ENDC} Saved user landmarks to '{outFile}'.")
+
     def displayReferenceVideo(self):
         """Display the next frame from the reference video, looping from the start when finished.
 
         Restarts from frame 0 when the video finishes. Converts from OpenCV BGR to Qt RGB format
         before displaying.
         """
+        now = time.time()
+        if now < self.referenceVideoPauseUntil:
+            return
+
         ret, frame = self.referenceVideo.read()
 
         if not ret:
             self.isTracking = False  # Stop tracking when video ends
             print(f"{HEADER}Stop tracking.{ENDC}")
             self.updateScore()  # Update the score display when the reference video finishes
+            self.saveUserLandmarks()  # Save collected webcam landmarks to file
 
             self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            ret, frame = self.referenceVideo.read()
+            self.referenceVideoPauseUntil = time.time() + self.referenceVideoLoopPause
+            return
 
         if ret:
             if not self.isTracking:

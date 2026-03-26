@@ -3,9 +3,9 @@
 ## 🎯 ToDo
 - [X] **Two HandAnnotation instances** Spraviť separátne anotovanie pre webcam a pre reference video.
 - [X] **Save landmarks** Ukladanie detegovaných bodov z rúk z reference videa.
-- [x] **Sampling gestures** Vyriešiť ako často sa budú ukladať ladmarky.
+- [X] **Sampling gestures** Vyriešiť ako často sa budú ukladať ladmarky.
 - [ ] **Save landmarks** Ukladanie detegovaných bodov z rúk z webky.
-- [ ] **Load landmarks** Načítať body ak už existujú a uložiť ich.
+- [X] **Load landmarks** Načítať body ak už existujú a uložiť ich.
 - [ ] **Scoring** Spraviť vzdialenostné funkcie.
 
 ---
