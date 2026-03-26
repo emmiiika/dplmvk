@@ -22,7 +22,7 @@
 - [X] **Landmark Extraction** Vytvoriť funkciu na extrakciu všetkých 21 bodov do numpy poľa.
 - [X] **Normalizácia (Translácia)** Odpočítať súradnice zápästia (ID 0) od všetkých ostatných bodov.
 - [X] **Normalizácia (Mierka)** Implementovať škálovanie podľa veľkosti dlane, aby sa vyrovnali rozdiely vo vzdialenosti od kamery.
-- [ ] **Vektorizácia** Previesť body na vektory reprezentujúce kosti prstov.
+- [?] **Vektorizácia** Previesť body na vektory reprezentujúce kosti prstov.
 
 ### Phase 3: Porovnávacie algoritmy (Similarity)
 - [ ] **Statické porovnanie** Implementovať Kosínovú podobnosť pre porovnanie dvoch konkrétnych póz.

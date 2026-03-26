@@ -1,3 +1,4 @@
 mediapipe
 opencv
+numpy
 pyside6
