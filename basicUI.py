@@ -166,10 +166,14 @@ class Window(QtWidgets.QWidget):
         randomVideo = random.choice(referenceVideosList)
         referenceVideoPath = os.path.join(self.FOLDER, randomVideo)
 
-        # Process the reference video to create an annotated version (or load from cache if it already exists)
+        # Build/load reference landmarks using the annotation pipeline.
+        # Playback below should still use the original (non-annotated) video.
         nonAnnotatedVideo = cv2.VideoCapture(referenceVideoPath)
         self.referenceAnnotation = HandAnnotation(nonAnnotatedVideo)
-        self.referenceVideo = self.annotateReferenceVideo(referenceVideoPath)
+        self.annotateReferenceVideo(referenceVideoPath)
+
+        # Display the original reference video in the UI.
+        self.referenceVideo = cv2.VideoCapture(referenceVideoPath)
 
         self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation)
 

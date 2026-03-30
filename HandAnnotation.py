@@ -102,7 +102,6 @@ class HandAnnotation:
                 mp.solutions.hands.HAND_CONNECTIONS,
                 mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
                 mp.solutions.drawing_styles.get_default_hand_connections_style(),
-                wrist,
             )
 
             # Calculate text position for handedness label (above the hand)
@@ -202,7 +201,7 @@ class HandAnnotation:
         coords = np.array([[lm.x, lm.y, lm.z] for lm in handLandmarks])
         if coords.shape[0] == 0:
             return coords
-        wrist = coords[LandmarkIndices.WRIST]  # Use wrist as origin
+        wrist = coords[LandmarkIndices.WRIST]  # Use wrist as origin of the hand coordinate system
         translatedCoords = coords - wrist
         return translatedCoords
 
