@@ -24,7 +24,7 @@ class HandAnnotation:
     FONT_SIZE = 1
     FONT_THICKNESS = 1
     HANDEDNESS_TEXT_COLOR = (88, 205, 54)  # vibrant green
-    SAMPLING_RATE = 0.05  # seconds (20 FPS)
+    SAMPLING_RATE = 0.04  # seconds (25 FPS)
 
     def __init__(self, videoInput):
         """
@@ -317,7 +317,7 @@ class HandAnnotation:
 
         framesProcessed = 0
         self.handLandmarksTimestamped = []  # Reset for new video
-        nextSampleTime = 0.0  # Sample at 20 FPS (every 0.05 seconds)
+        nextSampleTime = 0.0  # Sample at 25 FPS (every 0.04 seconds)
         ret, frame = video.read()
         while ret:
             annotated = self.processSpecificFrame(frame)

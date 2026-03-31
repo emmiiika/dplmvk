@@ -30,7 +30,7 @@ class Window(QtWidgets.QWidget):
 
     FOLDER = "../videa/"  # Path to the folder containing reference videos
     ANNOTATED_FOLDER = "../videa/.annotated/"  # Path to save annotated reference videos
-    SAMPLING_RATE = 0.05  # seconds (20 FPS) for collecting user landmarks during tracking
+    SAMPLING_RATE = 0.04  # seconds (25 FPS) for collecting user landmarks during tracking
 
     def __init__(self):
         """Initialize the main application window with video dimensions and UI components, trigger setup methods."""
@@ -138,9 +138,19 @@ class Window(QtWidgets.QWidget):
         filename = os.path.basename(referenceVideoPath)
         basename, ext = os.path.splitext(filename)
         outputPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
+        landmarksPath = os.path.splitext(outputPath)[0] + "_handLandmarks.json"
 
         if os.path.isfile(outputPath):
             print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
+
+            # Ensure reference landmarks are loaded when using cached annotated video.
+            loaded = self.referenceAnnotation.loadLandmarksFromFile(landmarksPath)
+            if loaded is None:
+                print(
+                    f"{WARNING}Warning{ENDC}: Cached landmarks missing for '{outputPath}'. "
+                    "Rebuilding annotated video and landmarks."
+                )
+                return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)
 
             return cv2.VideoCapture(outputPath)
 
@@ -253,7 +263,10 @@ class Window(QtWidgets.QWidget):
         currentScore = self.scoring.calculateScore(
             self.userLandmarksTimestamped
         )  # Calculate the score based on user landmarks during tracking
-        self.score.setText(f"Score: {currentScore:.2f}%")
+        print(f"Number of user landmarks: {len(self.userLandmarksTimestamped[1])}")
+        self.score.setText(f"Score: {currentScore * 100:.1f}%")
+
+        print(f"Raw score: {currentScore:.4f} ({currentScore * 100:.1f}%)")
 
 
 if __name__ == "__main__":

@@ -35,3 +35,6 @@
 - [ ] **Vizuálna odozva** Zmeniť farbu textu skóre (zelená pri zhode, červená pri chybe).
 - [ ] **Logovanie** Implementovať farebné výpisy do konzoly pre ľahší debugging (ANSI farby).
 
+## Notes
+
+Zatia+l som sa nedostala na lepsie skore ako 51%. Ale ak drzim cely cas ruky dole tak je to male skore a ked nimi hybem tak je to medzi 30-50%
