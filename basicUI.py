@@ -25,6 +25,82 @@ BASE_FPS = 30
 SPEED_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
 
+class TrimProgressBar(QtWidgets.QWidget):
+    """A progress bar that also draws trim-start and trim-end markers."""
+
+    BAR_COLOR = QtGui.QColor("#6666cc")
+    TRACK_COLOR = QtGui.QColor("#2a2a3e")
+    MARKER_COLOR = QtGui.QColor("#ffaa00")
+
+    MARKER_HIT_PX = 6  # pixel tolerance for hover detection
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._value = 0       # 0-1000
+        self._trimStart = 0   # 0-1000 position of start marker
+        self._trimEnd = 1000  # 0-1000 position of end marker
+        self._markersVisible = False
+        self.setFixedHeight(10)
+        self.setMouseTracking(True)
+
+    def setValue(self, v: int):
+        self._value = max(0, min(1000, v))
+        self.update()
+
+    def reset(self):
+        """Clear the bar and hide markers (e.g. while waiting for annotation)."""
+        self._value = 0
+        self._markersVisible = False
+        self.update()
+
+    def setTrimMarkers(self, start: int, end: int):
+        """Set trim markers in the same 0-1000 scale as value."""
+        self._trimStart = max(0, min(1000, start))
+        self._trimEnd = max(0, min(1000, end))
+        self._markersVisible = True
+        self.update()
+
+    def mouseMoveEvent(self, event):
+        x = event.position().x()
+        w = self.width()
+        startX = self._trimStart / 1000 * w
+        endX = self._trimEnd / 1000 * w
+        if self._markersVisible and abs(x - startX) <= self.MARKER_HIT_PX:
+            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(),
+                                        "Start of movement", self)
+        elif self._markersVisible and abs(x - endX) <= self.MARKER_HIT_PX:
+            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(),
+                                        "End of movement", self)
+        else:
+            QtWidgets.QToolTip.hideText()
+
+    def paintEvent(self, event):
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        r = h // 2
+
+        # Track
+        p.setPen(QtCore.Qt.PenStyle.NoPen)
+        p.setBrush(self.TRACK_COLOR)
+        p.drawRoundedRect(0, 0, w, h, r, r)
+
+        # Filled chunk (0 → current value)
+        fillRight = int(self._value / 1000 * w)
+        if fillRight > 0:
+            p.setBrush(self.BAR_COLOR)
+            p.drawRoundedRect(0, 0, fillRight, h, r, r)
+
+        # Trim markers — vertical lines
+        if self._markersVisible:
+            p.setPen(QtGui.QPen(self.MARKER_COLOR, 2))
+            for pos in (self._trimStart, self._trimEnd):
+                x = int(pos / 1000 * w)
+                p.drawLine(x, 0, x, h)
+
+        p.end()
+
+
 class AnnotationWorker(QtCore.QThread):
     """Background thread that runs createAnnotatedVideo so the UI stays responsive."""
 
@@ -160,16 +236,8 @@ class Window(QtWidgets.QWidget):
         )
 
         # --- Progress bar under the reference video ---
-        self.refProgressBar = QtWidgets.QProgressBar()
-        self.refProgressBar.setRange(0, 1000)
-        self.refProgressBar.setValue(0)
-        self.refProgressBar.setTextVisible(False)
-        self.refProgressBar.setFixedHeight(6)
+        self.refProgressBar = TrimProgressBar()
         self.refProgressBar.setFixedWidth(self.gestureVideoSize.width())
-        self.refProgressBar.setStyleSheet(
-            "QProgressBar { background-color: #2a2a3e; border: none; border-radius: 3px; }"
-            "QProgressBar::chunk { background-color: #6666cc; border-radius: 3px; }"
-        )
 
         # Wrap reference video stack + progress bar in a column
         refCol = QtWidgets.QVBoxLayout()
@@ -220,6 +288,7 @@ class Window(QtWidgets.QWidget):
             "QPushButton:hover { background-color: #3e3e70; }"
             "QPushButton:pressed { background-color: #555590; }"
             "QPushButton:checked { background-color: #4a4a90; border: 1px solid #8888cc; }"
+            "QPushButton:disabled { background-color: #1e1e30; color: #555566; border: 1px solid #333344; }"
         )
 
         def btn(text, tooltip):
@@ -460,7 +529,8 @@ class Window(QtWidgets.QWidget):
 
         if os.path.isfile(outputPath):
             print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
-
+            landmarkFile = f"{os.path.splitext(outputPath)[0]}_handLandmarks.json"
+            self.referenceAnnotation.loadLandmarksFromFile(landmarkFile)
             return cv2.VideoCapture(outputPath)
 
         return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
@@ -520,6 +590,10 @@ class Window(QtWidgets.QWidget):
                 self.refTimer.stop()
             self.isTracking = False
             self.userLandmarksTimestamped = []
+            for b in (self.btnPrev, self.btnPlayPause, self.btnNext):
+                b.setEnabled(False)
+            if hasattr(self, "refProgressBar"):
+                self.refProgressBar.reset()
             self._annotationWorker = AnnotationWorker(self.referenceAnnotation, path, annotatedPath)
             self._annotationWorker.finished.connect(self._onAnnotationFinished)
             self._annotationWorker.start()
@@ -534,6 +608,8 @@ class Window(QtWidgets.QWidget):
             self.refStack.setCurrentIndex(0)
         if hasattr(self, "refTimer"):
             self.refTimer.start(int(1000 / BASE_FPS))
+        for b in (self.btnPrev, self.btnPlayPause, self.btnNext):
+            b.setEnabled(True)
         print(f"{GREEN}✓{ENDC} Annotation complete, starting playback.")
 
     def _finishLoading(self, path, annotatedPath):
@@ -544,8 +620,18 @@ class Window(QtWidgets.QWidget):
         self.isTracking = False
         self.userLandmarksTimestamped = []
 
+        # Read pre-computed marker positions (0-1000 scale) from annotation object
+        markerStart = getattr(self.referenceAnnotation, "markerStart", 0)
+        markerEnd = getattr(self.referenceAnnotation, "markerEnd", 1000)
+
+        # Seek both captures to the beginning
+        self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        if self.annotatedReferenceVideo is not None:
+            self.annotatedReferenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
         if hasattr(self, "refProgressBar"):
             self.refProgressBar.setValue(0)
+            self.refProgressBar.setTrimMarkers(markerStart, markerEnd)
 
         if hasattr(self, "webcamAnnotation"):
             self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation)
@@ -617,6 +703,8 @@ class Window(QtWidgets.QWidget):
         else:
             retA, annotatedFrame = False, None
 
+        currentFrame = int(self.referenceVideo.get(cv2.CAP_PROP_POS_FRAMES))
+
         if not ret:
             self.isTracking = False  # Stop tracking when video ends
             print(f"{HEADER}Stop tracking.{ENDC}")
@@ -650,11 +738,10 @@ class Window(QtWidgets.QWidget):
 
             self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
 
-            # Update progress bar
+            # Update progress bar — map currentFrame to the 0-1000 scale
             totalFrames = int(self.referenceVideo.get(cv2.CAP_PROP_FRAME_COUNT))
-            currentFrame = int(self.referenceVideo.get(cv2.CAP_PROP_POS_FRAMES))
-            if totalFrames > 0:
-                self.refProgressBar.setValue(int(currentFrame / totalFrames * 1000))
+            if totalFrames > 1:
+                self.refProgressBar.setValue(int((currentFrame - 1) / (totalFrames - 1) * 1000))
 
     def updateScore(self):
         """Update the score display label with the current score, color-coded by performance level."""

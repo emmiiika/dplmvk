@@ -25,6 +25,8 @@ class HandAnnotation:
     FONT_THICKNESS = 1
     HANDEDNESS_TEXT_COLOR = (88, 205, 54)  # vibrant green
     SAMPLING_RATE = 0.05  # seconds (20 FPS)
+    TRIM_PADDING_SECONDS = 0.5  # seconds of padding kept before/after active hand region
+    MOVEMENT_THRESHOLD = 0.004  # mean landmark displacement (normalised 0-1 image coords) to count as movement
 
     def __init__(self, videoInput):
         """
@@ -52,6 +54,9 @@ class HandAnnotation:
 
         # Load the pre-trained hand landmarking model
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
+
+        self.markerStart = 0  # progress-bar position of movement start (0-1000 scale)
+        self.markerEnd = 1000  # progress-bar position of movement end (0-1000 scale)
 
         self.handLandmarksList = []  # Store detected hand landmarks for external access
         self.handLandmarksTimestamped = []  # Store timestamped hand landmarks
@@ -189,7 +194,9 @@ class HandAnnotation:
 
         # Save to JSON file
         with open(filePath, "w") as f:
-            json.dump(landmarksData, f, indent=2)
+            json.dump(
+                {"markerStart": self.markerStart, "markerEnd": self.markerEnd, "frames": landmarksData}, f, indent=2
+            )
         print(f"{GREEN}✓{ENDC} Landmarks saved to '{filePath}'")
 
     def _getTranslatedLandmarks(self, handLandmarks):
@@ -260,7 +267,17 @@ class HandAnnotation:
 
         try:
             with open(filePath, "r") as f:
-                landmarksData = json.load(f)
+                data = json.load(f)
+
+            # Support dict format {"markerStart":…, "markerEnd":…, "frames":[…]} and old plain-list format
+            if isinstance(data, dict):
+                landmarksData = data.get("frames", [])
+                self.markerStart = data.get("markerStart", 0)
+                self.markerEnd = data.get("markerEnd", 1000)
+            else:
+                landmarksData = data
+                self.markerStart = 0
+                self.markerEnd = 1000
 
             # Convert back to (timestamp, handLandmarks) tuples
             self.handLandmarksTimestamped = []
@@ -279,6 +296,76 @@ class HandAnnotation:
             print(f"{FAIL}Error{ENDC}: Failed to load landmarks: {e}")
             return None
 
+    def _findActiveFrameRange(self, videoPath, fps):
+        """Fast first pass: find first and last frame with significant hand movement.
+
+        Computes the mean absolute displacement of all detected landmark positions
+        between consecutive frames. Frames where this displacement exceeds
+        MOVEMENT_THRESHOLD are considered 'active'.
+
+        Args:
+            videoPath: Path to the video file.
+            fps: Frames per second (used to compute padding in frames).
+
+        Returns:
+            (trimStart, trimEnd) frame indices with padding applied, or (0, totalFrames-1)
+            if no movement is detected.
+        """
+        video = cv2.VideoCapture(videoPath)
+        totalFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        # Collect raw (image-space) landmark positions per frame
+        landmarksPerFrame = []
+        frameIdx = 0
+        ret, frame = video.read()
+        while ret:
+            rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
+            result = self.detector.detect(image)
+            if result.hand_landmarks:
+                # Flatten all detected hands into one position vector
+                coords = np.array([[lm.x, lm.y] for hand in result.hand_landmarks for lm in hand])
+                landmarksPerFrame.append((frameIdx, coords))
+            else:
+                landmarksPerFrame.append((frameIdx, None))
+            frameIdx += 1
+            ret, frame = video.read()
+        video.release()
+
+        if not landmarksPerFrame:
+            return 0, max(totalFrames - 1, 0)
+
+        # Compute per-frame displacement relative to the previous frame that had landmarks
+        firstActive = None
+        lastActive = None
+        prevCoords = None
+
+        for frameIdx, coords in landmarksPerFrame:
+            if coords is None:
+                prevCoords = None
+                continue
+            if prevCoords is not None and coords.shape == prevCoords.shape:
+                displacement = np.mean(np.linalg.norm(coords - prevCoords, axis=1))
+                if displacement >= self.MOVEMENT_THRESHOLD:
+                    if firstActive is None:
+                        firstActive = frameIdx
+                    lastActive = frameIdx
+            prevCoords = coords
+
+        if firstActive is None:
+            print(f"{WARNING}No hand movement detected in '{videoPath}', skipping trim.{ENDC}")
+            return 0, max(totalFrames - 1, 0)
+
+        pad = int(fps * self.TRIM_PADDING_SECONDS)
+        trimStart = max(0, firstActive - pad)
+        trimEnd = min(totalFrames - 1, lastActive + pad)
+        trimmedSeconds = (trimEnd - trimStart + 1) / fps
+        print(
+            f"{BLUE}Trim range: frames {trimStart}–{trimEnd} "
+            f"({trimmedSeconds:.1f}s / {totalFrames / fps:.1f}s total){ENDC}"
+        )
+        return trimStart, trimEnd
+
     def createAnnotatedVideo(self, videoPath, outputPath):
         """
         Create an annotated video from an input video file by processing each frame.
@@ -294,20 +381,27 @@ class HandAnnotation:
             annotated_video: OpenCV VideoCapture object for the output video, or None on failure.
         """
         print(f"Creating annotated video from {HEADER}'{videoPath}'{ENDC} at '{HEADER}{outputPath}{ENDC}'.")
-        video = cv2.VideoCapture(videoPath)
-        width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = video.get(cv2.CAP_PROP_FPS)
-        frameIdx = 0
 
-        # Initialize VideoWriter with MP4 codec at original FPS
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
-        out = cv2.VideoWriter(outputPath, fourcc, fps, (width, height))
-
-        if not video.isOpened():
+        # --- Pass 1: fast scan to determine trim boundaries ---
+        scanCap = cv2.VideoCapture(videoPath)
+        if not scanCap.isOpened():
             print(f"{FAIL}Error{ENDC}: Could not open video at '{videoPath}'.")
             return None
-        print(f"{GREEN}✓{ENDC} Video opened successfully from '{videoPath}'.")
+        fps = scanCap.get(cv2.CAP_PROP_FPS) or 30.0
+        width = int(scanCap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(scanCap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        totalFrames = int(scanCap.get(cv2.CAP_PROP_FRAME_COUNT))
+        scanCap.release()
+
+        trimStart, trimEnd = self._findActiveFrameRange(videoPath, fps)
+        denom = max(1, totalFrames - 1)
+        self.markerStart = int(trimStart / denom * 1000)
+        self.markerEnd = int(trimEnd / denom * 1000)
+
+        # --- Pass 2: annotate ALL frames (no skipping) ---
+        video = cv2.VideoCapture(videoPath)
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
+        out = cv2.VideoWriter(outputPath, fourcc, fps, (width, height))
 
         if not out.isOpened():
             print(f"{FAIL}Error{ENDC}: Could not initialize VideoWriter.")
@@ -317,7 +411,9 @@ class HandAnnotation:
 
         framesProcessed = 0
         self.handLandmarksTimestamped = []  # Reset for new video
-        nextSampleTime = 0.0  # Sample at 20 FPS (every 0.05 seconds)
+        nextSampleTime = 0.0
+        frameIdx = 0
+
         ret, frame = video.read()
         while ret:
             annotated = self.processSpecificFrame(frame)
@@ -328,12 +424,10 @@ class HandAnnotation:
 
             timestampSeconds = frameIdx / fps
             if timestampSeconds >= nextSampleTime:
-                # Store landmarks in dictionary format (x, y, z only)
                 self.handLandmarksTimestamped.append([timestampSeconds, self.handLandmarksList])
                 nextSampleTime += self.SAMPLING_RATE
 
             frameIdx += 1
-
             ret, frame = video.read()
 
         video.release()

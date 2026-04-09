@@ -16,11 +16,20 @@ a pre reference video.
 - [ ] **Next video** Po niekoľko percentách sa prehodí ďalšie video.
 - [X] **Loading screen** Pridať loading screen počas anotovania videa.
 - [X] **Progress bar** Pridať progress bar na referenčné video.
+- [ ] **Mená posunkov** Pridať pomenovania gest nad video.
+- [X] **Trim progress bar** Progress bar je k originálnemu videu.
+- [-] **Adjust video time** Keď oreže video, tak nechá plynúť čas neorezaného, t.j. zdvojí video.
+- [-] **Trim original video** Keď odstránim anotácie, tak mi prehrá neorezané video.
+- [X] **Gray out disabled buttons** Zošediť disablenuté tlačítka.
+- [ ] **Search bar** Pridať vyhľadávanie posunku.
+- [ ] **Link na web?** Namiesto šťahovania videí len link na web?
 
 
 ## Nápady - Možno niekedy
 - [ ] **Control gestures** Gestá spojené s buttonmi na ovládacom paneli.
 - [ ] **Additional video info** Na posunky.sk sú ďalšie info o videách, ktoré by sa dali použiť.
+- nakresliť vektory k prstom ako vizualizaciu chyb
+- prekryť ref video annot. s webcam annot a spraviť ako shmu radar guličky progress bar 
 
 ---
 
