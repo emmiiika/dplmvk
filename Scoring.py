@@ -8,9 +8,9 @@ class Scoring:
         self.referenceAnnotation = referenceAnnotation
 
     def calculateScore(self, user_landmarks=None):
-        print(
-            f"Calculating score, user_landmarks: {len(user_landmarks) if user_landmarks else 0}, reference_landmarks: {len(self.referenceAnnotation.handLandmarksTimestamped)}"
-        )
+        # print(
+        #     f"Calculating score, user_landmarks: {len(user_landmarks) if user_landmarks else 0}, reference_landmarks: {len(self.referenceAnnotation.handLandmarksTimestamped)}"
+        # )
 
         if user_landmarks is None:
             # Fallback to current landmarks if no sequence provided
@@ -26,7 +26,7 @@ class Scoring:
         # For now, placeholder
         score = 0.0
 
-        print(user_landmarks)
+        # print(user_landmarks)
         # print(reference_landmarks)
 
         return score

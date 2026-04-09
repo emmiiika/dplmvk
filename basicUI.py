@@ -25,6 +25,22 @@ BASE_FPS = 30
 SPEED_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
 
+class AnnotationWorker(QtCore.QThread):
+    """Background thread that runs createAnnotatedVideo so the UI stays responsive."""
+
+    finished = QtCore.Signal()
+
+    def __init__(self, referenceAnnotation, videoPath, outputPath, parent=None):
+        super().__init__(parent)
+        self._referenceAnnotation = referenceAnnotation
+        self._videoPath = videoPath
+        self._outputPath = outputPath
+
+    def run(self):
+        self._referenceAnnotation.createAnnotatedVideo(self._videoPath, self._outputPath)
+        self.finished.emit()
+
+
 # Main application window class for gesture recognition and video playback
 class Window(QtWidgets.QWidget):
     """Main application window for hand gesture recognition and reference video playback.
@@ -70,6 +86,9 @@ class Window(QtWidgets.QWidget):
         # Annotated reference video capture (pre-rendered with landmarks drawn)
         self.annotatedReferenceVideo = None
 
+        # Background annotation worker
+        self._annotationWorker = None
+
         # Playback mode: when True, the left panel shows the recorded video instead of webcam
         self.isPlaybackMode = False
         self.playbackCapture = None
@@ -103,6 +122,36 @@ class Window(QtWidgets.QWidget):
         self.gestureVideo.setFixedSize(self.gestureVideoSize)
         self.gestureVideo.setStyleSheet("background-color: #1a1a2e;")
 
+        # --- Loading overlay (shown while annotation is being processed) ---
+        self._loadingPage = QtWidgets.QWidget()
+        self._loadingPage.setFixedSize(self.gestureVideoSize)
+        self._loadingPage.setStyleSheet("background-color: #0d0d1a;")
+        _ll = QtWidgets.QVBoxLayout(self._loadingPage)
+        _ll.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        _loadingLabel = QtWidgets.QLabel("Annotating video…")
+        _loadingLabel.setStyleSheet(
+            "color: #c0c0e0; font-size: 18px; font-weight: bold; background: transparent;"
+        )
+        _loadingLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._annotationSpinner = QtWidgets.QProgressBar()
+        self._annotationSpinner.setRange(0, 0)  # indeterminate animation
+        self._annotationSpinner.setFixedWidth(300)
+        self._annotationSpinner.setFixedHeight(8)
+        self._annotationSpinner.setTextVisible(False)
+        self._annotationSpinner.setStyleSheet(
+            "QProgressBar { background-color: #2a2a3e; border: none; border-radius: 4px; }"
+            "QProgressBar::chunk { background-color: #6666cc; border-radius: 4px; }"
+        )
+        _ll.addWidget(_loadingLabel)
+        _ll.addSpacing(14)
+        _ll.addWidget(self._annotationSpinner, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        # Stack: index 0 = normal video, index 1 = loading screen
+        self.refStack = QtWidgets.QStackedWidget()
+        self.refStack.setFixedSize(self.gestureVideoSize)
+        self.refStack.addWidget(self.gestureVideo)   # index 0
+        self.refStack.addWidget(self._loadingPage)   # index 1
+
         # --- Score label (centred, between the two videos) ---
         self.score = QtWidgets.QLabel("Score: --%")
         self.score.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -112,7 +161,25 @@ class Window(QtWidgets.QWidget):
             "background-color: #2a2a3e; border-radius: 8px; padding: 8px 16px;"
         )
 
-        # --- Top row: [webcam] [score] [reference] ---
+        # --- Progress bar under the reference video ---
+        self.refProgressBar = QtWidgets.QProgressBar()
+        self.refProgressBar.setRange(0, 1000)
+        self.refProgressBar.setValue(0)
+        self.refProgressBar.setTextVisible(False)
+        self.refProgressBar.setFixedHeight(6)
+        self.refProgressBar.setFixedWidth(self.gestureVideoSize.width())
+        self.refProgressBar.setStyleSheet(
+            "QProgressBar { background-color: #2a2a3e; border: none; border-radius: 3px; }"
+            "QProgressBar::chunk { background-color: #6666cc; border-radius: 3px; }"
+        )
+
+        # Wrap reference video stack + progress bar in a column
+        refCol = QtWidgets.QVBoxLayout()
+        refCol.setSpacing(4)
+        refCol.addWidget(self.refStack)
+        refCol.addWidget(self.refProgressBar)
+
+        # --- Top row: [webcam] [score] [reference+bar] ---
         topRow = QtWidgets.QHBoxLayout()
         topRow.setSpacing(16)
         topRow.addWidget(self.webcam)
@@ -123,7 +190,7 @@ class Window(QtWidgets.QWidget):
         scoreCol.addStretch()
         topRow.addLayout(scoreCol)
 
-        topRow.addWidget(self.gestureVideo)
+        topRow.addLayout(refCol)
 
         # --- Control panel ---
         controlPanel = self._buildControlPanel()
@@ -420,6 +487,13 @@ class Window(QtWidgets.QWidget):
         if not self.videoQueue:
             return
 
+        # Cancel any in-progress annotation worker
+        if hasattr(self, "_annotationWorker") and self._annotationWorker is not None:
+            self._annotationWorker.finished.disconnect()
+            self._annotationWorker.quit()
+            self._annotationWorker.wait()
+            self._annotationWorker = None
+
         path = self.videoQueue[index]
 
         if hasattr(self, "referenceVideo") and self.referenceVideo is not None:
@@ -429,23 +503,60 @@ class Window(QtWidgets.QWidget):
 
         nonAnnotatedVideo = cv2.VideoCapture(path)
         self.referenceAnnotation = HandAnnotation(nonAnnotatedVideo)
-        self.annotateReferenceVideo(path)
 
-        self.referenceVideo = cv2.VideoCapture(path)
-
-        # Open the pre-annotated version for display when annotations are enabled
         filename = os.path.basename(path)
         basename, ext = os.path.splitext(filename)
         annotatedPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
-        self.annotatedReferenceVideo = cv2.VideoCapture(annotatedPath) if os.path.isfile(annotatedPath) else None
+
+        if os.path.isfile(annotatedPath):
+            # Already annotated — load landmarks from cache and continue immediately
+            self.annotateReferenceVideo(path)
+            self._finishLoading(path, annotatedPath)
+        else:
+            # Need to annotate — show loading screen and offload to background thread
+            self._pendingPath = path
+            self._pendingAnnotatedPath = annotatedPath
+            if hasattr(self, "refStack"):
+                self.refStack.setCurrentIndex(1)
+            if hasattr(self, "refTimer"):
+                self.refTimer.stop()
+            self.isTracking = False
+            self.userLandmarksTimestamped = []
+            self._annotationWorker = AnnotationWorker(
+                self.referenceAnnotation, path, annotatedPath
+            )
+            self._annotationWorker.finished.connect(self._onAnnotationFinished)
+            self._annotationWorker.start()
+            print(f"{BLUE}Annotating '{path}' in background…{ENDC}")
+
+    def _onAnnotationFinished(self):
+        """Called on the main thread when the background annotation worker completes."""
+        self._annotationWorker = None
+        self.annotateReferenceVideo(self._pendingPath)  # loads landmarks from the now-existing file
+        self._finishLoading(self._pendingPath, self._pendingAnnotatedPath)
+        if hasattr(self, "refStack"):
+            self.refStack.setCurrentIndex(0)
+        if hasattr(self, "refTimer"):
+            self.refTimer.start(int(1000 / BASE_FPS))
+        print(f"{GREEN}✓{ENDC} Annotation complete, starting playback.")
+
+    def _finishLoading(self, path, annotatedPath):
+        """Open captures, reset state, and wire up scoring after a video is ready."""
+        self.referenceVideo = cv2.VideoCapture(path)
+        self.annotatedReferenceVideo = (
+            cv2.VideoCapture(annotatedPath) if os.path.isfile(annotatedPath) else None
+        )
         self.referenceVideoPauseUntil = 0.0
         self.isTracking = False
         self.userLandmarksTimestamped = []
 
+        if hasattr(self, "refProgressBar"):
+            self.refProgressBar.setValue(0)
+
         if hasattr(self, "webcamAnnotation"):
             self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation)
 
-        print(f"{GREEN}✓{ENDC} Loaded reference video [{index}]: '{path}'.")
+        print(f"{GREEN}✓{ENDC} Loaded reference video [{self.videoQueueIndex}]: '{path}'.")
 
     def loadReferenceVideo(self):
         """Build queue and load the first reference video.
@@ -544,6 +655,12 @@ class Window(QtWidgets.QWidget):
                 image = QtGui.QImage(rgbFrame.data, w, h, bytesPerLine, QtGui.QImage.Format.Format_RGB888)
 
             self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
+
+            # Update progress bar
+            totalFrames = int(self.referenceVideo.get(cv2.CAP_PROP_FRAME_COUNT))
+            currentFrame = int(self.referenceVideo.get(cv2.CAP_PROP_POS_FRAMES))
+            if totalFrames > 0:
+                self.refProgressBar.setValue(int(currentFrame / totalFrames * 1000))
 
     def updateScore(self):
         """Update the score display label with the current score, color-coded by performance level."""
