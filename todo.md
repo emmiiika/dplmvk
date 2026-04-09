@@ -10,13 +10,17 @@ a pre reference video.
 - [X] **Scoring** Spraviť vzdialenostné funkcie.
 - [ ] **Improve accuracy** Zlepšiť hodnotenie.
 - [ ] **Text feedback** Navádzacie vety pre usera ako zlepšiť posunok.
-- [ ] **UI** Zlepšiť UI, pridať tlačitka.
+- [X] **UI** Zlepšiť UI, pridať tlačitka.
 - [ ] **Video experience** Orezať videá na rozumne dlhé. Odrezať hluché časti.
 - [ ] **Zohnať videá**
 - [ ] **Next video** Po niekoľko percentách sa prehodí ďalšie video.
+- [X] **Loading screen** Pridať loading screen počas anotovania videa.
+- [X] **Progress bar** Pridať progress bar na referenčné video.
 
 
+## Nápady - Možno niekedy
 - [ ] **Control gestures** Gestá spojené s buttonmi na ovládacom paneli.
+- [ ] **Additional video info** Na posunky.sk sú ďalšie info o videách, ktoré by sa dali použiť.
 
 ---
 

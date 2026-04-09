@@ -129,9 +129,7 @@ class Window(QtWidgets.QWidget):
         _ll = QtWidgets.QVBoxLayout(self._loadingPage)
         _ll.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         _loadingLabel = QtWidgets.QLabel("Annotating video…")
-        _loadingLabel.setStyleSheet(
-            "color: #c0c0e0; font-size: 18px; font-weight: bold; background: transparent;"
-        )
+        _loadingLabel.setStyleSheet("color: #c0c0e0; font-size: 18px; font-weight: bold; background: transparent;")
         _loadingLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._annotationSpinner = QtWidgets.QProgressBar()
         self._annotationSpinner.setRange(0, 0)  # indeterminate animation
@@ -149,8 +147,8 @@ class Window(QtWidgets.QWidget):
         # Stack: index 0 = normal video, index 1 = loading screen
         self.refStack = QtWidgets.QStackedWidget()
         self.refStack.setFixedSize(self.gestureVideoSize)
-        self.refStack.addWidget(self.gestureVideo)   # index 0
-        self.refStack.addWidget(self._loadingPage)   # index 1
+        self.refStack.addWidget(self.gestureVideo)  # index 0
+        self.refStack.addWidget(self._loadingPage)  # index 1
 
         # --- Score label (centred, between the two videos) ---
         self.score = QtWidgets.QLabel("Score: --%")
@@ -326,7 +324,7 @@ class Window(QtWidgets.QWidget):
 
     def _startRecording(self):
         os.makedirs(os.path.dirname(os.path.abspath(self.RECORDING_PATH)), exist_ok=True)
-        fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+        fourcc = cv2.VideoWriter_fourcc(*"MJPG")  # type: ignore
         fps = 30.0
         size = (self.videoSize.width(), self.videoSize.height())
         self.videoWriter = cv2.VideoWriter(self.RECORDING_PATH, fourcc, fps, size)
@@ -465,7 +463,7 @@ class Window(QtWidgets.QWidget):
 
             return cv2.VideoCapture(outputPath)
 
-        return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)
+        return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
 
     def _buildVideoQueue(self):
         """Scan FOLDER and build a shuffled list of available reference video paths."""
@@ -522,9 +520,7 @@ class Window(QtWidgets.QWidget):
                 self.refTimer.stop()
             self.isTracking = False
             self.userLandmarksTimestamped = []
-            self._annotationWorker = AnnotationWorker(
-                self.referenceAnnotation, path, annotatedPath
-            )
+            self._annotationWorker = AnnotationWorker(self.referenceAnnotation, path, annotatedPath)
             self._annotationWorker.finished.connect(self._onAnnotationFinished)
             self._annotationWorker.start()
             print(f"{BLUE}Annotating '{path}' in background…{ENDC}")
@@ -543,9 +539,7 @@ class Window(QtWidgets.QWidget):
     def _finishLoading(self, path, annotatedPath):
         """Open captures, reset state, and wire up scoring after a video is ready."""
         self.referenceVideo = cv2.VideoCapture(path)
-        self.annotatedReferenceVideo = (
-            cv2.VideoCapture(annotatedPath) if os.path.isfile(annotatedPath) else None
-        )
+        self.annotatedReferenceVideo = cv2.VideoCapture(annotatedPath) if os.path.isfile(annotatedPath) else None
         self.referenceVideoPauseUntil = 0.0
         self.isTracking = False
         self.userLandmarksTimestamped = []
