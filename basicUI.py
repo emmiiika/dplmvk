@@ -36,8 +36,8 @@ class TrimProgressBar(QtWidgets.QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._value = 0       # 0-1000
-        self._trimStart = 0   # 0-1000 position of start marker
+        self._value = 0  # 0-1000
+        self._trimStart = 0  # 0-1000 position of start marker
         self._trimEnd = 1000  # 0-1000 position of end marker
         self._markersVisible = False
         self.setFixedHeight(10)
@@ -66,11 +66,9 @@ class TrimProgressBar(QtWidgets.QWidget):
         startX = self._trimStart / 1000 * w
         endX = self._trimEnd / 1000 * w
         if self._markersVisible and abs(x - startX) <= self.MARKER_HIT_PX:
-            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(),
-                                        "Start of movement", self)
+            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(), "Start of movement", self)
         elif self._markersVisible and abs(x - endX) <= self.MARKER_HIT_PX:
-            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(),
-                                        "End of movement", self)
+            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(), "End of movement", self)
         else:
             QtWidgets.QToolTip.hideText()
 
@@ -526,11 +524,20 @@ class Window(QtWidgets.QWidget):
         filename = os.path.basename(referenceVideoPath)
         basename, ext = os.path.splitext(filename)
         outputPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
+        landmarksPath = os.path.splitext(outputPath)[0] + "_handLandmarks.json"
 
         if os.path.isfile(outputPath):
             print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
-            landmarkFile = f"{os.path.splitext(outputPath)[0]}_handLandmarks.json"
-            self.referenceAnnotation.loadLandmarksFromFile(landmarkFile)
+
+            # Ensure reference landmarks are loaded when using cached annotated video.
+            loaded = self.referenceAnnotation.loadLandmarksFromFile(landmarksPath)
+            if loaded is None:
+                print(
+                    f"{WARNING}Warning{ENDC}: Cached landmarks missing for '{outputPath}'. "
+                    "Rebuilding annotated video and landmarks."
+                )
+                return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)
+
             return cv2.VideoCapture(outputPath)
 
         return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
