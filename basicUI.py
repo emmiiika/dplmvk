@@ -526,11 +526,11 @@ class Window(QtWidgets.QWidget):
                 self.playbackCapture.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 ret, frame = self.playbackCapture.read()
             if ret:
-                if self.showAnnotations:
-                    image = self.webcamAnnotation.processSpecificFrame(frame, returnQt=True)
-                else:
-                    rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    image = self.webcamAnnotation.convertFrameToQtImage(rgbFrame)
+                image = self.webcamAnnotation.processSpecificFrame(
+                    frame,
+                    returnQt=True,
+                    drawAnnotations=self.showAnnotations,
+                )
                 if image is not None:
                     self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
             return
@@ -539,11 +539,11 @@ class Window(QtWidgets.QWidget):
         ret, frame = self.capture.read()
 
         if ret:
-            if self.showAnnotations:
-                image = self.webcamAnnotation.processSpecificFrame(frame, returnQt=True)
-            else:
-                rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                image = self.webcamAnnotation.convertFrameToQtImage(rgbFrame)
+            image = self.webcamAnnotation.processSpecificFrame(
+                frame,
+                returnQt=True,
+                drawAnnotations=self.showAnnotations,
+            )
 
             if image is not None:
                 self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))

@@ -148,12 +148,13 @@ class HandAnnotation:
             QtGui.QImage.Format.Format_RGB888,
         )
 
-    def processSpecificFrame(self, frame, returnQt=False):
+    def processSpecificFrame(self, frame, returnQt=False, drawAnnotations=True):
         """Process a provided frame (instead of capturing from camera) for hand detection and annotation.
 
         Args:
             frame: Input BGR image (numpy array) to process.
             returnQt: If True, return a Qt QImage; otherwise, return BGR image.
+            drawAnnotations: If True, draw landmarks and labels on output frame.
 
         Returns:
             annotated_frame: BGR image with hand annotations if returnQt=False, or QImage if returnQt=True, or None if frame is invalid.
@@ -165,12 +166,21 @@ class HandAnnotation:
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
 
         detectionResult = self.detector.detect(image)
-        annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
+
+        # Always compute and store normalized landmarks for downstream scoring.
+        translated = [self._getTranslatedLandmarks(hand) for hand in detectionResult.hand_landmarks]
+        normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]
+        self.handLandmarksList = self._landmarksToDict(normalized)
+
+        if drawAnnotations:
+            outputImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
+        else:
+            outputImage = image.numpy_view()
 
         if returnQt:
-            return self.convertFrameToQtImage(annotatedImage)
+            return self.convertFrameToQtImage(outputImage)
         else:
-            return cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR)
+            return cv2.cvtColor(outputImage, cv2.COLOR_RGB2BGR)
 
     def saveLandmarksToFile(self, outputPath):
         """Save the detected hand landmarks to a JSON file for later analysis and easy loading.
