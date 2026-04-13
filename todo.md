@@ -30,6 +30,7 @@ a pre reference video.
 - [ ] **Additional video info** Na posunky.sk sú ďalšie info o videách, ktoré by sa dali použiť.
 - nakresliť vektory k prstom ako vizualizaciu chyb
 - prekryť ref video annot. s webcam annot a spraviť ako shmu radar guličky progress bar 
+- ak metainfo o pocte ruk je ze len jedna, tak ratat iba jednu
 
 ---
 

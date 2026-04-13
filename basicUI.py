@@ -146,8 +146,9 @@ class Window(QtWidgets.QWidget):
         self.referenceVideoPauseUntil = 0.0
 
         # Reference video queue and navigation
-        self.videoQueue = []
+        self.videoQueue = []  # list of variant-groups: [[path, ...], ...]
         self.videoQueueIndex = 0
+        self.variantIndex = 0
 
         # Playback state
         self.refPaused = False
@@ -237,9 +238,45 @@ class Window(QtWidgets.QWidget):
         self.refProgressBar = TrimProgressBar()
         self.refProgressBar.setFixedWidth(self.gestureVideoSize.width())
 
-        # Wrap reference video stack + progress bar in a column
+        # --- Gesture name row with variant navigation arrows ---
+        self.gestureName = QtWidgets.QLabel("—")
+        self.gestureName.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.gestureName.setStyleSheet("font-size: 18px; font-weight: bold; color: #c0c0e0; background: transparent;")
+
+        _varBtnStyle = (
+            "QPushButton { background-color: #2e2e50; color: #e0e0e0;"
+            " border: 1px solid #444466; border-radius: 5px;"
+            " padding: 2px 8px; font-size: 14px; }"
+            "QPushButton:hover { background-color: #3e3e70; }"
+            "QPushButton:disabled { background-color: #1e1e30; color: #555566;"
+            " border: 1px solid #333344; }"
+        )
+        self.btnVariantPrev = QtWidgets.QPushButton("<")
+        self.btnVariantPrev.setToolTip("Previous variant (same gesture)")
+        self.btnVariantPrev.setStyleSheet(_varBtnStyle)
+        self.btnVariantPrev.setFixedWidth(32)
+        self.btnVariantNext = QtWidgets.QPushButton(">")
+        self.btnVariantNext.setToolTip("Next variant (same gesture)")
+        self.btnVariantNext.setStyleSheet(_varBtnStyle)
+        self.btnVariantNext.setFixedWidth(32)
+        self.btnVariantPrev.clicked.connect(self.onPrevVariant)
+        self.btnVariantNext.clicked.connect(self.onNextVariant)
+
+        _nameRow = QtWidgets.QHBoxLayout()
+        _nameRow.setContentsMargins(6, 2, 6, 2)
+        _nameRow.setSpacing(4)
+        _nameRow.addWidget(self.btnVariantPrev)
+        _nameRow.addWidget(self.gestureName, 1)
+        _nameRow.addWidget(self.btnVariantNext)
+        _nameContainer = QtWidgets.QWidget()
+        _nameContainer.setFixedWidth(self.gestureVideoSize.width())
+        _nameContainer.setStyleSheet("background-color: #1e1e30; border-radius: 6px;")
+        _nameContainer.setLayout(_nameRow)
+
+        # Wrap gesture name row + reference video stack + progress bar in a column
         refCol = QtWidgets.QVBoxLayout()
         refCol.setSpacing(4)
+        refCol.addWidget(_nameContainer)
         refCol.addWidget(self.refStack)
         refCol.addWidget(self.refProgressBar)
 
@@ -363,7 +400,7 @@ class Window(QtWidgets.QWidget):
     # ------------------------------------------------------------------
 
     def onPrevVideo(self):
-        """Navigate to the previous video in the queue."""
+        """Navigate to the previous gesture in the queue (resets to basic variant)."""
         if not self.videoQueue:
             return
         self.videoQueueIndex = (self.videoQueueIndex - 1) % len(self.videoQueue)
@@ -376,11 +413,31 @@ class Window(QtWidgets.QWidget):
         print(f"{BLUE}Toggled play/pause.{ENDC}")
 
     def onNextVideo(self):
-        """Advance to the next video in the queue."""
+        """Advance to the next gesture in the queue (resets to basic variant)."""
         if not self.videoQueue:
             return
         self.videoQueueIndex = (self.videoQueueIndex + 1) % len(self.videoQueue)
         self._loadVideoAtIndex(self.videoQueueIndex)
+
+    def onPrevVariant(self):
+        """Show the previous variant of the current gesture."""
+        if not self.videoQueue:
+            return
+        variants = self.videoQueue[self.videoQueueIndex]
+        if len(variants) < 2:
+            return
+        self.variantIndex = (self.variantIndex - 1) % len(variants)
+        self._loadVideoAtIndex(self.videoQueueIndex, self.variantIndex)
+
+    def onNextVariant(self):
+        """Show the next variant of the current gesture."""
+        if not self.videoQueue:
+            return
+        variants = self.videoQueue[self.videoQueueIndex]
+        if len(variants) < 2:
+            return
+        self.variantIndex = (self.variantIndex + 1) % len(variants)
+        self._loadVideoAtIndex(self.videoQueueIndex, self.variantIndex)
 
     def onRecord(self):
         """Start or stop recording the webcam stream."""
@@ -530,37 +587,64 @@ class Window(QtWidgets.QWidget):
             print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
 
             # Ensure reference landmarks are loaded when using cached annotated video.
-            loaded = self.referenceAnnotation.loadLandmarksFromFile(landmarksPath)
+            loaded = self.referenceAnnotation.loadLandmarksFromFile(landmarksPath)  # type: ignore
             if loaded is None:
                 print(
                     f"{WARNING}Warning{ENDC}: Cached landmarks missing for '{outputPath}'. "
                     "Rebuilding annotated video and landmarks."
                 )
-                return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)
+                return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
 
             return cv2.VideoCapture(outputPath)
 
         return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
 
+    # Known variant suffixes (order defines browse order within a group)
+    VARIANT_SUFFIXES = ("_left", "_side")
+
     def _buildVideoQueue(self):
-        """Scan FOLDER and build a shuffled list of available reference video paths."""
+        """Scan FOLDER, group files by gesture name, return a shuffled list of variant-groups.
+
+        Each group is a list of paths: the basic variant (no suffix) first, then others
+        sorted alphabetically.  The main queue contains one entry per gesture; the arrows
+        above the reference video let the user cycle through variants within a gesture.
+        """
         if not os.path.exists(self.FOLDER) or not os.path.isdir(self.FOLDER):
             print(f"{FAIL}Error{ENDC}: folder does not exist or is not a directory: {self.FOLDER}")
             return []
 
         allFiles = os.listdir(self.FOLDER)
-        videos = [
-            os.path.join(self.FOLDER, f)
-            for f in allFiles
-            if not f.startswith(".") and os.path.isfile(os.path.join(self.FOLDER, f))
-        ]
-        random.shuffle(videos)
-        return videos
+        videoFiles = [f for f in allFiles if not f.startswith(".") and os.path.isfile(os.path.join(self.FOLDER, f))]
 
-    def _loadVideoAtIndex(self, index):
-        """Load and configure the reference video at *index* in the queue."""
+        def _baseName(stem):
+            for suffix in self.VARIANT_SUFFIXES:
+                if stem.endswith(suffix):
+                    return stem[: -len(suffix)]
+            return stem
+
+        def _variantKey(path):
+            stem = os.path.splitext(os.path.basename(path))[0]
+            for i, suffix in enumerate(self.VARIANT_SUFFIXES):
+                if stem.endswith(suffix):
+                    return (i + 1, stem)
+            return (0, stem)  # basic variant sorts first
+
+        groups = {}  # type: ignore
+        for f in videoFiles:
+            stem, _ = os.path.splitext(f)
+            base = _baseName(stem)
+            groups.setdefault(base, []).append(os.path.join(self.FOLDER, f))
+
+        sortedGroups = [sorted(paths, key=_variantKey) for paths in groups.values()]
+        random.shuffle(sortedGroups)
+        return sortedGroups
+
+    def _loadVideoAtIndex(self, groupIndex, variantIndex=0):
+        """Load the reference video at *groupIndex* in the queue, *variantIndex* within its group."""
         if not self.videoQueue:
             return
+
+        self.variantIndex = variantIndex
 
         # Cancel any in-progress annotation worker
         if hasattr(self, "_annotationWorker") and self._annotationWorker is not None:
@@ -569,7 +653,10 @@ class Window(QtWidgets.QWidget):
             self._annotationWorker.wait()
             self._annotationWorker = None
 
-        path = self.videoQueue[index]
+        path = self.videoQueue[groupIndex][variantIndex]
+
+        # Update the gesture name label immediately (known before annotation completes)
+        self._updateGestureName(path)
 
         if hasattr(self, "referenceVideo") and self.referenceVideo is not None:
             self.referenceVideo.release()
@@ -597,7 +684,7 @@ class Window(QtWidgets.QWidget):
                 self.refTimer.stop()
             self.isTracking = False
             self.userLandmarksTimestamped = []
-            for b in (self.btnPrev, self.btnPlayPause, self.btnNext):
+            for b in (self.btnPrev, self.btnPlayPause, self.btnNext, self.btnVariantPrev, self.btnVariantNext):
                 b.setEnabled(False)
             if hasattr(self, "refProgressBar"):
                 self.refProgressBar.reset()
@@ -605,6 +692,29 @@ class Window(QtWidgets.QWidget):
             self._annotationWorker.finished.connect(self._onAnnotationFinished)
             self._annotationWorker.start()
             print(f"{BLUE}Annotating '{path}' in background…{ENDC}")
+
+    def _updateGestureName(self, path):
+        """Update the gesture name label and variant arrow visibility for the given path."""
+        if not hasattr(self, "gestureName"):
+            return
+        stem = os.path.splitext(os.path.basename(path))[0]
+        for suffix in self.VARIANT_SUFFIXES:
+            if stem.endswith(suffix):
+                stem = stem[: -len(suffix)]
+                break
+        numVariants = len(self.videoQueue[self.videoQueueIndex]) if self.videoQueue else 1
+        if numVariants > 1:
+            currentStem = os.path.splitext(os.path.basename(path))[0]
+            variantLabel = " (basic)"
+            for suffix in self.VARIANT_SUFFIXES:
+                if currentStem.endswith(suffix):
+                    variantLabel = f" ({suffix[1:]})"
+                    break
+            self.gestureName.setText(stem + variantLabel)
+        else:
+            self.gestureName.setText(stem)
+        self.btnVariantPrev.setVisible(numVariants > 1)
+        self.btnVariantNext.setVisible(numVariants > 1)
 
     def _onAnnotationFinished(self):
         """Called on the main thread when the background annotation worker completes."""
@@ -615,7 +725,7 @@ class Window(QtWidgets.QWidget):
             self.refStack.setCurrentIndex(0)
         if hasattr(self, "refTimer"):
             self.refTimer.start(int(1000 / BASE_FPS))
-        for b in (self.btnPrev, self.btnPlayPause, self.btnNext):
+        for b in (self.btnPrev, self.btnPlayPause, self.btnNext, self.btnVariantPrev, self.btnVariantNext):
             b.setEnabled(True)
         print(f"{GREEN}✓{ENDC} Annotation complete, starting playback.")
 
@@ -656,8 +766,9 @@ class Window(QtWidgets.QWidget):
             return None
 
         self.videoQueueIndex = 0
+        self.variantIndex = 0
         self._loadVideoAtIndex(self.videoQueueIndex)
-        return self.videoQueue[self.videoQueueIndex]
+        return self.videoQueue[self.videoQueueIndex][self.variantIndex]
 
     def setupPlayer(self):
         """Initialize reference video playback and start the display refresh timer."""
