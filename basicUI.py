@@ -125,7 +125,7 @@ class Window(QtWidgets.QWidget):
 
     FOLDER = "../videa/"  # Path to the folder containing reference videos
     ANNOTATED_FOLDER = "../videa/.annotated/"  # Path to save annotated reference videos
-    SAMPLING_RATE = 0.04  # seconds (25 FPS) for collecting user landmarks during tracking
+    SAMPLING_RATE = 1.0 / 30.0  # seconds (30 FPS) for collecting user landmarks during tracking
     RECORDING_PATH = "../videa/.recorded/user_recording.avi"
 
     def __init__(self):

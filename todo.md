@@ -11,12 +11,12 @@ a pre reference video.
 - [ ] **Improve accuracy** Zlepšiť hodnotenie.
 - [ ] **Text feedback** Navádzacie vety pre usera ako zlepšiť posunok.
 - [X] **UI** Zlepšiť UI, pridať tlačitka.
-- [ ] **Video experience** Orezať videá na rozumne dlhé. Odrezať hluché časti.
+- [-] **Video experience** Orezať videá na rozumne dlhé. Odrezať hluché časti.
 - [ ] **Zohnať videá**
 - [ ] **Next video** Po niekoľko percentách sa prehodí ďalšie video.
 - [X] **Loading screen** Pridať loading screen počas anotovania videa.
 - [X] **Progress bar** Pridať progress bar na referenčné video.
-- [ ] **Mená posunkov** Pridať pomenovania gest nad video.
+- [X] **Mená posunkov** Pridať pomenovania gest nad video.
 - [X] **Trim progress bar** Progress bar je k originálnemu videu.
 - [-] **Adjust video time** Keď oreže video, tak nechá plynúť čas neorezaného, t.j. zdvojí video.
 - [-] **Trim original video** Keď odstránim anotácie, tak mi prehrá neorezané video.

@@ -24,7 +24,7 @@ class HandAnnotation:
     FONT_SIZE = 1
     FONT_THICKNESS = 1
     HANDEDNESS_TEXT_COLOR = (88, 205, 54)  # vibrant green
-    SAMPLING_RATE = 0.05  # seconds (20 FPS)
+    SAMPLING_RATE = 1.0 / 30.0  # seconds (30 FPS)
     TRIM_PADDING_SECONDS = 0.5  # seconds of padding kept before/after active hand region
     MOVEMENT_THRESHOLD = 0.004  # mean landmark displacement (normalised 0-1 image coords) to count as movement
 
@@ -337,7 +337,7 @@ class HandAnnotation:
                 coords = np.array([[lm.x, lm.y] for hand in result.hand_landmarks for lm in hand])
                 landmarksPerFrame.append((frameIdx, coords))
             else:
-                landmarksPerFrame.append((frameIdx, None))
+                landmarksPerFrame.append((frameIdx, None))  # type: ignore
             frameIdx += 1
             ret, frame = video.read()
         video.release()
@@ -368,7 +368,7 @@ class HandAnnotation:
 
         pad = int(fps * self.TRIM_PADDING_SECONDS)
         trimStart = max(0, firstActive - pad)
-        trimEnd = min(totalFrames - 1, lastActive + pad)
+        trimEnd = min(totalFrames - 1, lastActive + pad)  # type: ignore # but keep in mind
         trimmedSeconds = (trimEnd - trimStart + 1) / fps
         print(
             f"{BLUE}Trim range: frames {trimStart}–{trimEnd} "
