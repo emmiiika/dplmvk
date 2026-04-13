@@ -58,6 +58,9 @@ class Scoring:
         Returns:
             float: Combined similarity score (0.0 to 1.0)
         """
+        # Score only within the active reference interval marked on the progress bar.
+        reference_sequence = self._trimReferenceSequenceByMarkers(reference_sequence)
+
         # Extract per-frame hand arrays: each frame is (hand0_array_or_None, hand1_array_or_None)
         user_frames = self._extractPerHandArrays(user_sequence)
         ref_frames = self._extractPerHandArrays(reference_sequence)
@@ -73,14 +76,6 @@ class Scoring:
         # where the user mostly holds the neutral/rest position.
         reference_motion_energy = self._averageMotionEnergy(ref_frames, hand_weights)
         user_motion_energy = self._averageMotionEnergy(user_frames, hand_weights)
-
-        # Remove low-motion start/end segments (relaxed neutral pose) from both sequences
-        # so scoring focuses primarily on the actual gesture movement.
-        user_frames = self._trimLowMotionEdges(user_frames, hand_weights)
-        ref_frames = self._trimLowMotionEdges(ref_frames, hand_weights)
-
-        if len(user_frames) == 0 or len(ref_frames) == 0:
-            return 0.0
 
         # Method 1: DTW for temporal alignment (handles different speeds)
         dtw_distance = self._dtwDistance(user_frames, ref_frames, hand_weights)
@@ -122,6 +117,36 @@ class Scoring:
         print(f"  Combined score: {combined_score:.4f}")
 
         return combined_score
+
+    def _trimReferenceSequenceByMarkers(self, reference_sequence):
+        """Keep only the marker-selected interval from the reference sequence.
+
+        Marker positions are expected in 0-1000 scale (same as progress bar).
+        """
+        if not reference_sequence:
+            return reference_sequence
+
+        marker_start = getattr(self.referenceAnnotation, "markerStart", 0)
+        marker_end = getattr(self.referenceAnnotation, "markerEnd", 1000)
+
+        marker_start = int(max(0, min(1000, marker_start)))
+        marker_end = int(max(0, min(1000, marker_end)))
+        if marker_end < marker_start:
+            marker_start, marker_end = marker_end, marker_start
+
+        total = len(reference_sequence)
+        if total <= 1:
+            return reference_sequence
+
+        start_idx = int((marker_start / 1000.0) * (total - 1))
+        end_idx = int((marker_end / 1000.0) * (total - 1))
+
+        start_idx = max(0, min(total - 1, start_idx))
+        end_idx = max(start_idx, min(total - 1, end_idx))
+
+        trimmed = reference_sequence[start_idx : end_idx + 1]
+        print(f"Reference trim by markers: {start_idx}-{end_idx} ({len(trimmed)}/{total} frames retained)")
+        return trimmed
 
     def _extractPerHandArrays(self, sequence):
         """
