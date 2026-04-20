@@ -25,8 +25,8 @@ class HandAnnotation:
     FONT_THICKNESS = 1
     HANDEDNESS_TEXT_COLOR = (88, 205, 54)  # vibrant green
     SAMPLING_RATE = 1.0 / 30.0  # seconds (30 FPS)
-    TRIM_PADDING_SECONDS = 0.5  # seconds of padding kept before/after active hand region
-    MOVEMENT_THRESHOLD = 0.004  # mean landmark displacement (normalised 0-1 image coords) to count as movement
+    TRIM_PADDING_SECONDS = 0.25  # seconds of padding kept before/after active hand region
+    MOVEMENT_THRESHOLD = 0.01  # mean landmark displacement (normalised 0-1 image coords) to count as movement
 
     def __init__(self, videoInput):
         """
@@ -60,6 +60,7 @@ class HandAnnotation:
 
         self.handLandmarksList = []  # Store detected hand landmarks for external access
         self.handLandmarksTimestamped = []  # Store timestamped hand landmarks
+        self.wristTrajectoryList = []  # Store original wrist positions for each hand and frame
 
     def getHandLandmarks(self):
         """Return the list of detected hand landmarks from the most recent detection result."""
@@ -88,6 +89,16 @@ class HandAnnotation:
 
     def drawLandmarksOnImage(self, rgbImage, detectionResult):
         """Overlay detected hand landmarks, connections, and handedness labels onto the image."""
+        # Store original wrist positions before normalization
+        self.wristTrajectoryList = []
+        original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in detectionResult.hand_landmarks]
+        for coords in original_coords:
+            if coords.shape[0] > LandmarkIndices.WRIST:
+                wrist = coords[LandmarkIndices.WRIST]
+                self.wristTrajectoryList.append(wrist.tolist())
+            else:
+                self.wristTrajectoryList.append([None, None, None])
+
         # Normalize landmarks: translate (wrist-centered) then scale (hand-size invariant)
         translated = [self._getTranslatedLandmarks(hand) for hand in detectionResult.hand_landmarks]
         normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]

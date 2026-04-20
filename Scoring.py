@@ -6,18 +6,74 @@ import numpy as np
 import math
 
 
+# Scoring strategy presets — change the strategy name to switch behaviour.
+# Each strategy defines the tunable calibration parameters.
+SCORING_STRATEGIES = {
+    "original": {
+        "dtwMaxDistance": 2.0,
+        "euclideanMaxDistance": 1.5,
+        "dtwWeight": 0.55,
+        "euclideanWeight": 0.10,
+        "cosineWeight": 0.35,
+        "activityThreshold": 0.6,
+    },
+    "relaxed_distances": {
+        "dtwMaxDistance": 3.5,
+        "euclideanMaxDistance": 3.0,
+        "dtwWeight": 0.55,
+        "euclideanWeight": 0.10,
+        "cosineWeight": 0.35,
+        "activityThreshold": 0.6,
+    },
+    "lower_activity": {
+        "dtwMaxDistance": 2.0,
+        "euclideanMaxDistance": 1.5,
+        "dtwWeight": 0.55,
+        "euclideanWeight": 0.10,
+        "cosineWeight": 0.35,
+        "activityThreshold": 0.35,
+    },
+    "cosine_heavy": {
+        "dtwMaxDistance": 2.0,
+        "euclideanMaxDistance": 1.5,
+        "dtwWeight": 0.45,
+        "euclideanWeight": 0.10,
+        "cosineWeight": 0.45,
+        "activityThreshold": 0.6,
+    },
+    "all_combined": {
+        "dtwMaxDistance": 3.5,
+        "euclideanMaxDistance": 3.0,
+        "dtwWeight": 0.45,
+        "euclideanWeight": 0.10,
+        "cosineWeight": 0.45,
+        "activityThreshold": 0.35,
+    },
+}
+
+
 class Scoring:
-    def __init__(self, webcamAnnotation, referenceAnnotation):
+    TRIM_MOTION_FLOOR_RATIO = 0.4  # fraction of peak motion below which a frame is considered idle
+    TRIM_PADDING_FRAMES = 2  # extra frames kept before/after the detected active region
+    TRIM_MIN_ACTIVE_FRAMES = 5  # minimum frames to retain; skip trimming if result would be shorter
+    TRIM_ABSOLUTE_MOTION_FLOOR = 0.02  # minimum motion energy to count as genuine movement (not jitter)
+
+    def __init__(self, webcamAnnotation, referenceAnnotation, strategy="original"):
         """Initialize scoring with user and reference annotation sources.
 
         Args:
             webcamAnnotation: Annotation provider for user/webcam landmarks.
             referenceAnnotation: Annotation provider for reference landmarks and markers.
+            strategy: Name of a scoring strategy from SCORING_STRATEGIES.
         """
         self.webcamAnnotation = webcamAnnotation
         self.referenceAnnotation = referenceAnnotation
+        if strategy not in SCORING_STRATEGIES:
+            raise ValueError(f"Unknown scoring strategy '{strategy}'. " f"Available: {list(SCORING_STRATEGIES.keys())}")
+        self.strategy = SCORING_STRATEGIES[strategy]
+        print(f"Scoring strategy: {strategy}")
 
-    def calculateScore(self, userLandmarks=None):
+    def calculateScore(self, userLandmarks=None, includeWristTrajectory=True, wristWeight=0.3):
         """
         Calculate similarity score between user landmarks and reference landmarks.
 
@@ -44,11 +100,52 @@ class Scoring:
             print("Warning: No reference landmarks available for comparison")
             return 0.0
 
-        # Calculate comprehensive similarity score
+        # Calculate hand shape similarity score
         score = self._calculateSequenceSimilarity(userLandmarks, referenceLandmarks)
 
+        # Optionally add wrist trajectory similarity
+        if includeWristTrajectory:
+            userWrist = self._extractWristTrajectory(self.webcamAnnotation)
+            refWrist = self._extractWristTrajectory(self.referenceAnnotation)
+            # Remove None values and align lengths
+            userWrist = [w for w in userWrist if w[0] is not None]
+            refWrist = [w for w in refWrist if w[0] is not None]
+            minLen = min(len(userWrist), len(refWrist))
+            userWrist = userWrist[:minLen]
+            refWrist = refWrist[:minLen]
+            if minLen > 2:
+                # Compute DTW and Euclidean distance for wrist trajectory
+                wristArr1 = np.array(userWrist)
+                wristArr2 = np.array(refWrist)
+                dtwDist = self._dtwDistance([w.reshape(1, 3) for w in wristArr1], [w.reshape(1, 3) for w in wristArr2])
+                dtwSim = self._distanceToSimilarity(dtwDist, maxPossibleDistance=1.0)
+                euclDist = np.mean(np.linalg.norm(wristArr1 - wristArr2, axis=1))
+                euclSim = self._distanceToSimilarity(euclDist, maxPossibleDistance=1.0)
+                wristScore = 0.6 * dtwSim + 0.4 * euclSim
+                print(
+                    f"Wrist DTW similarity: {dtwSim:.4f}, Euclidean similarity: {euclSim:.4f}, Combined: {wristScore:.4f}"
+                )
+                # Combine with hand shape score
+                score = (1 - wristWeight) * score + wristWeight * wristScore
         print(f"Calculated similarity score: {score:.4f}")
         return score
+
+    def _extractWristTrajectory(self, annotation):
+        """Extracts the wrist trajectory (list of [x, y, z]) from an annotation object (HandAnnotation)."""
+        # Try to get wristTrajectoryList if present, else fallback to extracting from handLandmarksTimestamped
+        if hasattr(annotation, "wristTrajectoryList") and annotation.wristTrajectoryList:
+            return annotation.wristTrajectoryList
+        # Fallback: extract from timestamped landmarks (first hand only)
+        result = []
+        for frame in getattr(annotation, "handLandmarksTimestamped", []):
+            # frame: (timestamp, [hands...]) or dict
+            hands = frame[1] if isinstance(frame, (tuple, list)) and len(frame) > 1 else frame.get("landmarks", [])
+            if hands and len(hands) > 0 and len(hands[0]) > 0:
+                wrist = hands[0][0]  # Assume wrist is first landmark
+                result.append([wrist["x"], wrist["y"], wrist["z"]])
+            else:
+                result.append([None, None, None])
+        return result
 
     def _calculateSequenceSimilarity(self, userSequence, referenceSequence):
         """
@@ -80,23 +177,29 @@ class Scoring:
         referenceMotionEnergy = self._averageMotionEnergy(refFrames, handWeights)
         userMotionEnergy = self._averageMotionEnergy(userFrames, handWeights)
 
+        # Trim idle/rest frames from the edges of the user sequence.
+        userFrames = self._trimLowMotionEdges(userFrames, handWeights)
+        print(f"  User frames after trim: {len(userFrames)}")
+
+        s = self.strategy
+
         # Method 1: DTW for temporal alignment (handles different speeds)
         dtwDistance = self._dtwDistance(userFrames, refFrames, handWeights)
-        # Tight calibration: DTW distances around ~1 should already be considered fairly dissimilar.
-        dtwSimilarity = self._distanceToSimilarity(dtwDistance, maxPossibleDistance=2.0)
+        dtwSimilarity = self._distanceToSimilarity(dtwDistance, maxPossibleDistance=s["dtwMaxDistance"])
 
         # Method 2: Average Euclidean distance between corresponding frames
         euclideanDistance = self._averageEuclideanDistance(userFrames, refFrames, handWeights)
-        # Looser calibration to reduce over-penalization from viewpoint changes.
-        euclideanSimilarity = self._distanceToSimilarity(euclideanDistance, maxPossibleDistance=1.5)
+        euclideanSimilarity = self._distanceToSimilarity(
+            euclideanDistance, maxPossibleDistance=s["euclideanMaxDistance"]
+        )
 
         # Method 3: Cosine similarity for pose comparison
         cosineSim = self._averageCosineSimilarity(userFrames, refFrames, handWeights)
 
         # Combine metrics with weights.
-        # Favor temporal + structural similarity so the same gesture from different
-        # camera viewpoints remains comparably scored.
-        combinedScore = 0.55 * dtwSimilarity + 0.10 * euclideanSimilarity + 0.35 * cosineSim
+        combinedScore = (
+            s["dtwWeight"] * dtwSimilarity + s["euclideanWeight"] * euclideanSimilarity + s["cosineWeight"] * cosineSim
+        )
 
         # Motion-activity penalty:
         # If the reference contains meaningful motion, but the user sequence stays
@@ -104,7 +207,7 @@ class Scoring:
         activityFactor = 1.0
         minReferenceMotion = 0.003
         if referenceMotionEnergy > minReferenceMotion:
-            expectedUserMotion = referenceMotionEnergy * 0.6
+            expectedUserMotion = referenceMotionEnergy * s["activityThreshold"]
             if expectedUserMotion > 0:
                 activityFactor = max(0.0, min(1.0, userMotionEnergy / expectedUserMotion))
 
@@ -186,16 +289,22 @@ class Scoring:
             elif isinstance(frame, (tuple, list)) and len(frame) >= 2:
                 landmarks = frame[1]
 
-            if len(landmarks) == 0:
+            # Skip frame if no hand detected
+            if not landmarks or (isinstance(landmarks, list) and len(landmarks) == 0):
                 continue
 
             hands = self._extractHandsFromFrameLandmarks(landmarks)
-            if len(hands) == 0:
+            # Skip frame if no valid hand arrays extracted
+            if not hands or all(h is None or (isinstance(h, np.ndarray) and h.size == 0) for h in hands):
                 continue
 
             hand0 = hands[0] if len(hands) > 0 else None
             hand1 = hands[1] if len(hands) > 1 else None
-            frames.append((hand0, hand1))
+            # Only include frame if at least one hand is present and non-empty
+            if (hand0 is not None and (not isinstance(hand0, np.ndarray) or hand0.size > 0)) or (
+                hand1 is not None and (not isinstance(hand1, np.ndarray) or hand1.size > 0)
+            ):
+                frames.append((hand0, hand1))
 
         return frames
 
@@ -278,22 +387,23 @@ class Scoring:
 
         return [0.5, 0.5]
 
-    def _trimLowMotionEdges(self, frames, handWeights, motionFloorRatio=0.2, minActiveFrames=5):
+    def _trimLowMotionEdges(self, frames, handWeights):
         """
         Trim low-motion frames at the beginning and end of a sequence.
 
         This reduces the influence of neutral/rest hand pose before and after gesture execution.
+        Uses class constants TRIM_MOTION_FLOOR_RATIO, TRIM_PADDING_FRAMES, and
+        TRIM_MIN_ACTIVE_FRAMES (analogous to HandAnnotation.MOVEMENT_THRESHOLD /
+        TRIM_PADDING_SECONDS).
 
         Args:
             frames: Sequence of per-frame tuples (hand0, hand1), each hand as ndarray or None.
             handWeights: Two-element list of per-hand weights used to compute motion energy.
-            motionFloorRatio: Relative activity threshold as a fraction of the maximum motion.
-            minActiveFrames: Minimum retained length; shorter trims are discarded.
 
         Returns:
             Trimmed frame sequence, or the original sequence when trimming is not reliable.
         """
-        if len(frames) <= minActiveFrames:
+        if len(frames) <= self.TRIM_MIN_ACTIVE_FRAMES:
             return frames
 
         # Per-frame weighted motion energy (frame 0 has no previous frame).
@@ -322,45 +432,48 @@ class Scoring:
         if maxMotion <= 1e-8:
             return frames
 
-        # Keep frames whose motion is above a relative floor (with a tiny absolute floor).
-        threshold = max(maxMotion * motionFloorRatio, 1e-4)
+        # Use the higher of the relative floor (fraction of peak) and the absolute floor.
+        # The absolute floor ensures that pure jitter (static user) isn't mistaken for motion.
+        threshold = max(maxMotion * self.TRIM_MOTION_FLOOR_RATIO, self.TRIM_ABSOLUTE_MOTION_FLOOR)
         activeIndices = [i for i, e in enumerate(motion) if e >= threshold]
 
         if not activeIndices:
             return frames
 
-        # Expand by a small margin so transitions around active motion are preserved.
-        start = max(0, activeIndices[0] - 1)
-        end = min(len(frames), activeIndices[-1] + 2)
+        # Expand by padding so transitions around active motion are preserved.
+        pad = self.TRIM_PADDING_FRAMES
+        start = max(0, activeIndices[0] - pad)
+        end = min(len(frames), activeIndices[-1] + pad + 1)
 
         trimmed = frames[start:end]
         # Avoid returning overly short clips that could destabilize scoring.
-        if len(trimmed) < minActiveFrames:
+        if len(trimmed) < self.TRIM_MIN_ACTIVE_FRAMES:
             return frames
 
         return trimmed
 
     def _averageMotionEnergy(self, frames, handWeights):
         """
-        Compute average frame-to-frame motion energy for a sequence.
+        Compute median frame-to-frame motion energy for a sequence.
 
-        Uses weighted per-hand mean landmark displacement.
+        Uses the median (not mean) of weighted per-hand landmark displacements
+        to be robust against outlier spikes from tracker glitches (hand loss,
+        handedness flips, re-detection jumps).
 
         Args:
             frames: Sequence of per-frame tuples (hand0, hand1).
             handWeights: Two-element list of per-hand weights.
 
         Returns:
-            float: Mean weighted motion energy across consecutive frames.
+            float: Median weighted motion energy across consecutive frames.
         """
         # Need at least two frames to compute frame-to-frame motion.
         if len(frames) < 2:
             return 0.0
 
-        total = 0.0
-        count = 0
+        energies = []
 
-        # Accumulate weighted displacement between consecutive frames.
+        # Collect weighted displacement between consecutive frames.
         for i in range(1, len(frames)):
             prevFrame = frames[i - 1]
             currFrame = frames[i]
@@ -378,15 +491,14 @@ class Scoring:
 
                 energy += w * float(np.mean(np.linalg.norm(currHand - prevHand, axis=1)))
 
-            total += energy
-            count += 1
+            energies.append(energy)
 
         # Guard against empty effective comparisons (e.g., missing hands everywhere).
-        if count == 0:
+        if len(energies) == 0:
             return 0.0
 
-        # Return average per-step motion energy.
-        return total / count
+        # Median is robust to outlier spikes from tracker glitches.
+        return float(np.median(energies))
 
     def _dtwDistance(self, seq1, seq2, handWeights=None):
         """

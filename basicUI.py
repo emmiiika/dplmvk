@@ -5,10 +5,16 @@ from HandAnnotation import HandAnnotation
 import numpy as np
 import os
 import random
-from Scoring import Scoring
+from Scoring import Scoring, SCORING_STRATEGIES
 import time
 import json
 import copy
+
+# ── Scoring strategy ─────────────────────────────────────────────────────────
+# Change this single variable to switch scoring behaviour.
+# Available strategies: "original", "relaxed_distances", "lower_activity",
+#                       "cosine_heavy", "all_combined"
+SCORING_STRATEGY = "original"
 
 
 # ANSI escape codes for colored terminal output
@@ -133,7 +139,7 @@ class Window(QtWidgets.QWidget):
         super().__init__()
         # Define video dimensions for webcam and reference video
         self.videoSize = QtCore.QSize(640, 480)
-        self.gestureVideoSize = QtCore.QSize(640, 480)
+        self.gestureVideoSize = QtCore.QSize(640, 360)
 
         # Tracking state for user movement comparison
         self.isTracking = False
@@ -155,7 +161,8 @@ class Window(QtWidgets.QWidget):
 
         # Recording state
         self.isRecording = False
-        self.videoWriter = None
+        self.recordedFrames = []  # raw frames buffered during recording
+        self.recordingStartTime = None
         self.lastRecordingPath = None
 
         # Annotated reference video capture (pre-rendered with landmarks drawn)
@@ -167,7 +174,11 @@ class Window(QtWidgets.QWidget):
         # Playback mode: when True, the left panel shows the recorded video instead of webcam
         self.isPlaybackMode = False
         self.playbackCapture = None
-
+        self.playbackFps = 30.0  # FPS read from the recorded video file
+        self.nextPlaybackFrameTime = 0.0  # wall-clock time at which to advance to the next frame
+        self.currentPlaybackFrame = None  # last decoded frame, held between timer ticks
+        # Reference video frame-rate gating (wall-clock deadline per frame)
+        self.nextRefFrameTime = 0.0
         # Annotation visibility
         self.showAnnotations = True
 
@@ -269,29 +280,27 @@ class Window(QtWidgets.QWidget):
         _nameRow.addWidget(self.gestureName, 1)
         _nameRow.addWidget(self.btnVariantNext)
         _nameContainer = QtWidgets.QWidget()
-        _nameContainer.setFixedWidth(self.gestureVideoSize.width())
         _nameContainer.setStyleSheet("background-color: #1e1e30; border-radius: 6px;")
         _nameContainer.setLayout(_nameRow)
 
-        # Wrap gesture name row + reference video stack + progress bar in a column
+        # Ref video + progress bar
         refCol = QtWidgets.QVBoxLayout()
         refCol.setSpacing(4)
-        refCol.addWidget(_nameContainer)
         refCol.addWidget(self.refStack)
         refCol.addWidget(self.refProgressBar)
+        refWidget = QtWidgets.QWidget()
+        refWidget.setLayout(refCol)
 
-        # --- Top row: [webcam] [score] [reference+bar] ---
-        topRow = QtWidgets.QHBoxLayout()
-        topRow.setSpacing(16)
-        topRow.addWidget(self.webcam)
-
-        scoreCol = QtWidgets.QVBoxLayout()
-        scoreCol.addStretch()
-        scoreCol.addWidget(self.score)
-        scoreCol.addStretch()
-        topRow.addLayout(scoreCol)
-
-        topRow.addLayout(refCol)
+        # --- Top grid: webcam spans all 3 rows; name / score / ref in column 1 ---
+        grid = QtWidgets.QGridLayout()
+        grid.setSpacing(12)
+        grid.addWidget(self.webcam, 0, 0, 3, 1)  # rows 0-2, col 0
+        grid.addWidget(self.score, 0, 1, QtCore.Qt.AlignmentFlag.AlignCenter)  # row 0, col 1
+        grid.addWidget(_nameContainer, 1, 1)  # row 1, col 1
+        grid.addWidget(refWidget, 2, 1)  # row 2, col 1
+        grid.setRowStretch(0, 0)
+        grid.setRowStretch(1, 1)
+        grid.setRowStretch(2, 0)
 
         # --- Control panel ---
         controlPanel = self._buildControlPanel()
@@ -300,7 +309,7 @@ class Window(QtWidgets.QWidget):
         root = QtWidgets.QVBoxLayout()
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
-        root.addLayout(topRow)
+        root.addLayout(grid)
         root.addWidget(controlPanel)
         self.setLayout(root)
 
@@ -448,10 +457,8 @@ class Window(QtWidgets.QWidget):
 
     def _startRecording(self):
         os.makedirs(os.path.dirname(os.path.abspath(self.RECORDING_PATH)), exist_ok=True)
-        fourcc = cv2.VideoWriter_fourcc(*"MJPG")  # type: ignore
-        fps = 30.0
-        size = (self.videoSize.width(), self.videoSize.height())
-        self.videoWriter = cv2.VideoWriter(self.RECORDING_PATH, fourcc, fps, size)
+        self.recordedFrames = []
+        self.recordingStartTime = time.time()
         self.isRecording = True
         self.lastRecordingPath = self.RECORDING_PATH
         self.btnRecord.setText("⏹")
@@ -459,14 +466,23 @@ class Window(QtWidgets.QWidget):
         print(f"{BLUE}Recording started.{ENDC}")
 
     def _stopRecording(self):
-        if self.videoWriter is not None:
-            self.videoWriter.release()
-            self.videoWriter = None
         self.isRecording = False
         self.btnRecord.setText("⏺")
-        # Reset button style
         self.btnRecord.setStyleSheet(self.btnRecord.styleSheet().replace("#6e2020", "#2e2e50"))
-        print(f"{BLUE}Recording stopped, saved to '{self.RECORDING_PATH}'.{ENDC}")
+
+        if self.recordedFrames:
+            elapsed = time.time() - self.recordingStartTime  # type: ignore
+            actual_fps = len(self.recordedFrames) / elapsed if elapsed > 0 else 30.0
+            h, w = self.recordedFrames[0].shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*"MJPG")  # type: ignore
+            writer = cv2.VideoWriter(self.RECORDING_PATH, fourcc, actual_fps, (w, h))
+            for frame in self.recordedFrames:
+                writer.write(frame)
+            writer.release()
+            self.recordedFrames = []
+            print(f"{BLUE}Recording stopped, saved to '{self.RECORDING_PATH}' at {actual_fps:.1f} FPS.{ENDC}")
+        else:
+            print(f"{BLUE}Recording stopped, no frames captured.{ENDC}")
 
     def onPlayback(self):
         """Toggle playback of the last recorded video in the webcam slot."""
@@ -483,9 +499,13 @@ class Window(QtWidgets.QWidget):
                 print(f"{WARNING}Warning:{ENDC} No recorded video to play back.")
                 return
             self.playbackCapture = cv2.VideoCapture(self.lastRecordingPath)
+            fps = self.playbackCapture.get(cv2.CAP_PROP_FPS)
+            self.playbackFps = fps if fps > 0 else 30.0
+            self.nextPlaybackFrameTime = time.time()
+            self.currentPlaybackFrame = None
             self.isPlaybackMode = True
             self.btnPlayback.setText("📷")
-            print(f"{BLUE}Playing back recorded video.{ENDC}")
+            print(f"{BLUE}Playing back recorded video at {self.playbackFps:.1f} FPS.{ENDC}")
 
     def onToggleAnnotations(self, checked: bool):
         """Show or hide hand annotations on both video streams."""
@@ -520,12 +540,18 @@ class Window(QtWidgets.QWidget):
         Collects user landmarks for scoring when tracking is active.
         """
         if self.isPlaybackMode and self.playbackCapture is not None:
-            ret, frame = self.playbackCapture.read()
-            if not ret:
-                # Loop playback from start
-                self.playbackCapture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            now = time.time()
+            if now >= self.nextPlaybackFrameTime:
                 ret, frame = self.playbackCapture.read()
-            if ret:
+                if not ret:
+                    # Loop playback from start
+                    self.playbackCapture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = self.playbackCapture.read()
+                if ret:
+                    self.currentPlaybackFrame = frame
+                self.nextPlaybackFrameTime += 1.0 / self.playbackFps
+            frame = self.currentPlaybackFrame
+            if frame is not None:
                 image = self.webcamAnnotation.processSpecificFrame(
                     frame,
                     returnQt=True,
@@ -548,9 +574,9 @@ class Window(QtWidgets.QWidget):
             if image is not None:
                 self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
 
-            # Write frame to video file when recording
-            if self.isRecording and self.videoWriter is not None:
-                self.videoWriter.write(frame)
+            # Buffer frame during recording
+            if self.isRecording:
+                self.recordedFrames.append(frame.copy())
 
             # Collect user landmarks at the configured sampling rate when tracking is active
             if self.isTracking:
@@ -750,8 +776,11 @@ class Window(QtWidgets.QWidget):
             self.refProgressBar.setValue(0)
             self.refProgressBar.setTrimMarkers(markerStart, markerEnd)
 
+        # Reset reference frame deadline so playback starts immediately
+        self.nextRefFrameTime = time.time()
+
         if hasattr(self, "webcamAnnotation"):
-            self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation)
+            self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation, strategy=SCORING_STRATEGY)
 
         print(f"{GREEN}✓{ENDC} Loaded reference video [{self.videoQueueIndex}]: '{path}'.")
 
@@ -814,6 +843,26 @@ class Window(QtWidgets.QWidget):
         if not hasattr(self, "referenceVideo") or self.referenceVideo is None:
             return
 
+        # Gate frame reads to the video's actual FPS
+        if now < self.nextRefFrameTime:
+            return
+        refFps = self.referenceVideo.get(cv2.CAP_PROP_FPS)
+        if refFps <= 0:
+            refFps = BASE_FPS
+        speed = SPEED_STEPS[self.speedIndex]
+        frame_interval = 1.0 / (refFps * speed)
+
+        # How many frame periods have elapsed since the last delivery?
+        # Skip all but the last so playback stays in sync with wall-clock time.
+        frames_elapsed = max(1, int((now - self.nextRefFrameTime) / frame_interval) + 1)
+        self.nextRefFrameTime += frames_elapsed * frame_interval
+
+        for _ in range(frames_elapsed - 1):
+            if not self.referenceVideo.grab():
+                break
+            if self.annotatedReferenceVideo is not None:
+                self.annotatedReferenceVideo.grab()
+
         ret, frame = self.referenceVideo.read()
         # Read the annotated frame in sync (discard if not needed)
         if self.annotatedReferenceVideo is not None:
@@ -832,7 +881,9 @@ class Window(QtWidgets.QWidget):
             self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
             if self.annotatedReferenceVideo is not None:
                 self.annotatedReferenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            self.referenceVideoPauseUntil = time.time() + self.referenceVideoLoopPause
+            pause_until = time.time() + self.referenceVideoLoopPause
+            self.referenceVideoPauseUntil = pause_until
+            self.nextRefFrameTime = pause_until  # re-arm deadline after the pause
             return
 
         if ret:
@@ -845,15 +896,15 @@ class Window(QtWidgets.QWidget):
                 self.nextSampleTime = 0.0
                 self.userLandmarksTimestamped = []
 
-            if self.showAnnotations and retA and annotatedFrame is not None:
-                rgbFrame = cv2.cvtColor(annotatedFrame, cv2.COLOR_BGR2RGB)
-                image = self.referenceAnnotation.convertFrameToQtImage(rgbFrame)
-            else:
-                rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                h, w, ch = rgbFrame.shape
-                bytesPerLine = ch * w
-                image = QtGui.QImage(rgbFrame.data, w, h, bytesPerLine, QtGui.QImage.Format.Format_RGB888)
-
+            src = annotatedFrame if (self.showAnnotations and retA and annotatedFrame is not None) else frame
+            rgbFrame = cv2.cvtColor(src, cv2.COLOR_BGR2RGB)
+            rgbFrame = cv2.resize(
+                rgbFrame,
+                (self.gestureVideoSize.width(), self.gestureVideoSize.height()),
+                interpolation=cv2.INTER_LINEAR,
+            )
+            h, w, ch = rgbFrame.shape
+            image = QtGui.QImage(rgbFrame.data, w, h, ch * w, QtGui.QImage.Format.Format_RGB888)
             self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
 
             # Update progress bar — map currentFrame to the 0-1000 scale
