@@ -74,15 +74,18 @@ class Scoring:
         print(f"Scoring strategy: {strategy}")
 
     def calculateScore(self, userLandmarks=None, includeWristTrajectory=True, wristWeight=0.3):
-        """
-        Calculate similarity score between user landmarks and reference landmarks.
+        """Calculate similarity score between user landmarks and reference landmarks.
 
         Args:
-            userLandmarks: List of timestamped landmark sequences from user webcam.
-                          Format: [{"timestamp": float, "landmarks": [{"x": float, "y": float, "z": float}, ...]}, ...]
+            userLandmarks: List of timestamped landmark sequences captured from the webcam.
+                           Each entry is a tuple (timestamp, landmarks) where landmarks is
+                           a list of per-hand landmark dicts with keys 'x', 'y', 'z'.
+            includeWristTrajectory: If True, blend in a wrist-trajectory similarity term.
+            wristWeight: Weight of the wrist trajectory term in the final blended score
+                         (0.0 = ignore wrist, 1.0 = wrist only).
 
         Returns:
-            float: Similarity score between 0.0 (no similarity) and 1.0 (perfect match)
+            float: Similarity score between 0.0 (no similarity) and 1.0 (perfect match).
         """
         print(
             f"Calculating score, userLandmarks: {len(userLandmarks) if userLandmarks else 0}, referenceLandmarks: {len(self.referenceAnnotation.handLandmarksTimestamped)}"
@@ -131,7 +134,18 @@ class Scoring:
         return score
 
     def _extractWristTrajectory(self, annotation):
-        """Extracts the wrist trajectory (list of [x, y, z]) from an annotation object (HandAnnotation)."""
+        """Extract the wrist (landmark 0) trajectory from an annotation object.
+
+        Prefers `wristTrajectoryList` if present on the annotation; otherwise falls
+        back to extracting landmark 0 of the first hand from `handLandmarksTimestamped`.
+
+        Args:
+            annotation: A HandAnnotation instance (webcam or reference).
+
+        Returns:
+            List of [x, y, z] positions, one per frame.  Frames where no hand was
+            detected contain [None, None, None].
+        """
         # Try to get wristTrajectoryList if present, else fallback to extracting from handLandmarksTimestamped
         if hasattr(annotation, "wristTrajectoryList") and annotation.wristTrajectoryList:
             return annotation.wristTrajectoryList
