@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import mediapipe as mp  # type: ignore
 from mediapipe import framework
-from PySide6 import QtCore, QtWidgets, QtGui, QtMultimediaWidgets, QtMultimedia
+from PySide6 import QtGui
 import os
 import json
 from LandmarkIndices import LandmarkIndices

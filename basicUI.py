@@ -886,39 +886,34 @@ class Window(QtWidgets.QWidget):
             self.nextRefFrameTime = pause_until  # re-arm deadline after the pause
             return
 
-        if ret:
-            if not self.isTracking:
-                # Start tracking when the reference video begins playing
-                self.isTracking = True
-                print(f"{HEADER}Start tracking.{ENDC}")
+        if not self.isTracking:
+            # Start tracking when the reference video begins playing
+            self.isTracking = True
+            print(f"{HEADER}Start tracking.{ENDC}")
+            self.startTime = time.time()
+            self.nextSampleTime = 0.0
+            self.userLandmarksTimestamped = []
 
-                self.startTime = time.time()
-                self.nextSampleTime = 0.0
-                self.userLandmarksTimestamped = []
+        src = annotatedFrame if (self.showAnnotations and retA and annotatedFrame is not None) else frame
+        rgbFrame = cv2.cvtColor(src, cv2.COLOR_BGR2RGB)
+        rgbFrame = cv2.resize(
+            rgbFrame,
+            (self.gestureVideoSize.width(), self.gestureVideoSize.height()),
+            interpolation=cv2.INTER_LINEAR,
+        )
+        h, w, ch = rgbFrame.shape
+        image = QtGui.QImage(rgbFrame.data, w, h, ch * w, QtGui.QImage.Format.Format_RGB888)
+        self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
 
-            src = annotatedFrame if (self.showAnnotations and retA and annotatedFrame is not None) else frame
-            rgbFrame = cv2.cvtColor(src, cv2.COLOR_BGR2RGB)
-            rgbFrame = cv2.resize(
-                rgbFrame,
-                (self.gestureVideoSize.width(), self.gestureVideoSize.height()),
-                interpolation=cv2.INTER_LINEAR,
-            )
-            h, w, ch = rgbFrame.shape
-            image = QtGui.QImage(rgbFrame.data, w, h, ch * w, QtGui.QImage.Format.Format_RGB888)
-            self.gestureVideo.setPixmap(QtGui.QPixmap.fromImage(image))
-
-            # Update progress bar — map currentFrame to the 0-1000 scale
-            totalFrames = int(self.referenceVideo.get(cv2.CAP_PROP_FRAME_COUNT))
-            if totalFrames > 1:
-                self.refProgressBar.setValue(int((currentFrame - 1) / (totalFrames - 1) * 1000))
+        # Update progress bar — map currentFrame to the 0-1000 scale
+        totalFrames = int(self.referenceVideo.get(cv2.CAP_PROP_FRAME_COUNT))
+        if totalFrames > 1:
+            self.refProgressBar.setValue(int((currentFrame - 1) / (totalFrames - 1) * 1000))
 
     def updateScore(self):
         """Update the score display label with the current score, color-coded by performance level."""
 
-        currentScore = self.scoring.calculateScore(
-            self.userLandmarksTimestamped
-        )  # Calculate the score based on user landmarks during tracking
-        # print(f"Number of user landmarks: {len(self.userLandmarksTimestamped)}")
+        currentScore = self.scoring.calculateScore(self.userLandmarksTimestamped)
         pct = currentScore * 100
         self.score.setText(f"Score: {pct:.1f}%")
 
@@ -933,8 +928,6 @@ class Window(QtWidgets.QWidget):
             f"font-size: 22px; font-weight: bold; color: {color};"
             "background-color: #2a2a3e; border-radius: 8px; padding: 8px 16px;"
         )
-
-        # print(f"Raw score: {currentScore:.4f} ({pct:.1f}%)")
 
 
 if __name__ == "__main__":

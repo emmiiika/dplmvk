@@ -1,7 +1,3 @@
-# AI GENERATED
-
-from HandAnnotation import HandAnnotation
-import cv2
 import numpy as np
 import math
 
