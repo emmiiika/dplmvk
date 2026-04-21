@@ -193,10 +193,9 @@ class Scoring:
 
         s = self.strategy
 
-        # Method 1: DTW for temporal alignment — also produces the warping path
+        # Method 1: DTW for temporal alignment — produces the warping path
         # used to align frames for Euclidean and Cosine metrics.
         dtwDistance, warpingPath = self._dtwWithPath(userFrames, refFrames, handWeights)
-        dtwSimilarity = self._distanceToSimilarity(dtwDistance, maxPossibleDistance=s["dtwMaxDistance"])
 
         # Reindex both sequences according to the DTW warping path so that
         # Euclidean and Cosine metrics compare temporally matched frames.
@@ -212,9 +211,11 @@ class Scoring:
         # Method 3: Cosine similarity on DTW-aligned frames
         cosineSim = self._averageCosineSimilarity(alignedUserFrames, alignedRefFrames, handWeights)
 
-        # Combine metrics with weights.
+        # Combine metrics with weights (DTW similarity excluded; weights normalized).
+        euclideanCosineWeight = s["euclideanWeight"] + s["cosineWeight"]
         combinedScore = (
-            s["dtwWeight"] * dtwSimilarity + s["euclideanWeight"] * euclideanSimilarity + s["cosineWeight"] * cosineSim
+            (s["euclideanWeight"] * euclideanSimilarity + s["cosineWeight"] * cosineSim) / euclideanCosineWeight
+            if euclideanCosineWeight > 0 else 0.0
         )
 
         # Motion-activity penalty:
@@ -233,7 +234,6 @@ class Scoring:
         print(f"  Frames used (user/reference): {len(userFrames)}/{len(refFrames)}")
         print(f"  Motion energy (user/reference): {userMotionEnergy:.5f}/{referenceMotionEnergy:.5f}")
         print(f"  Activity factor: {activityFactor:.3f}")
-        print(f"  DTW similarity: {dtwSimilarity:.4f}")
         print(f"  Euclidean similarity: {euclideanSimilarity:.4f}")
         print(f"  Cosine similarity: {cosineSim:.4f}")
 

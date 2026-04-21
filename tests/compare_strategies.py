@@ -132,14 +132,16 @@ def score_pair(user_path, ref_path, strategy_name):
     user_frames = scorer._trimLowMotionEdges(user_frames, hand_weights)
 
     s = scorer.strategy
-    dtw_dist = scorer._dtwDistance(user_frames, ref_frames, hand_weights)
-    eucl_dist = scorer._averageEuclideanDistance(user_frames, ref_frames, hand_weights)
-    cos_sim = scorer._averageCosineSimilarity(user_frames, ref_frames, hand_weights)
+    dtw_dist, warping_path = scorer._dtwWithPath(user_frames, ref_frames, hand_weights)
+    aligned_user = [user_frames[i] for (i, j) in warping_path]
+    aligned_ref = [ref_frames[j] for (i, j) in warping_path]
 
-    dtw_sim = scorer._distanceToSimilarity(dtw_dist, maxPossibleDistance=s["dtwMaxDistance"])
+    eucl_dist = scorer._averageEuclideanDistance(aligned_user, aligned_ref, hand_weights)
+    cos_sim = scorer._averageCosineSimilarity(aligned_user, aligned_ref, hand_weights)
+
     eucl_sim = scorer._distanceToSimilarity(eucl_dist, maxPossibleDistance=s["euclideanMaxDistance"])
-
-    combined = s["dtwWeight"] * dtw_sim + s["euclideanWeight"] * eucl_sim + s["cosineWeight"] * cos_sim
+    eucl_cos_weight = s["euclideanWeight"] + s["cosineWeight"]
+    combined = (s["euclideanWeight"] * eucl_sim + s["cosineWeight"] * cos_sim) / eucl_cos_weight if eucl_cos_weight > 0 else 0.0
 
     activity = 1.0
     if ref_energy > 0.003:
