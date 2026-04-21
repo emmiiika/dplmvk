@@ -61,6 +61,7 @@ class HandAnnotation:
         self.handLandmarksList = []  # Store detected hand landmarks for external access
         self.handLandmarksTimestamped = []  # Store timestamped hand landmarks
         self.wristTrajectoryList = []  # Store original wrist positions for each hand and frame
+        self.currentWristPositions = []  # Original wrist [x,y,z] per hand for the latest frame
 
     def getHandLandmarks(self):
         """Return the list of detected hand landmarks from the most recent detection result."""
@@ -92,12 +93,15 @@ class HandAnnotation:
         # Store original wrist positions before normalization
         self.wristTrajectoryList = []
         original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in detectionResult.hand_landmarks]
+        self.currentWristPositions = []
         for coords in original_coords:
             if coords.shape[0] > LandmarkIndices.WRIST:
                 wrist = coords[LandmarkIndices.WRIST]
                 self.wristTrajectoryList.append(wrist.tolist())
+                self.currentWristPositions.append(wrist.tolist())
             else:
                 self.wristTrajectoryList.append([None, None, None])
+                self.currentWristPositions.append(None)
 
         # Normalize landmarks: translate (wrist-centered) then scale (hand-size invariant)
         translated = [self._getTranslatedLandmarks(hand) for hand in detectionResult.hand_landmarks]
@@ -204,16 +208,19 @@ class HandAnnotation:
         filePath = f"{base}_handLandmarks.json"
 
         # Convert landmarks to a serializable format
-        landmarksData = []
-        for timestamp, handLandmarks in self.handLandmarksTimestamped:
+        landmarksData = []  # type: ignore
+        for entry in self.handLandmarksTimestamped:
+            timestamp = entry[0]
+            handLandmarks = entry[1]
             # Flatten all hands into one list of landmark dicts
             allLandmarks = []
             for hand in handLandmarks:
                 allLandmarks.extend(hand)
             frameData = {"timestamp": round(timestamp, 3), "landmarks": allLandmarks}
+            # Include raw wrist positions if saved alongside landmarks
+            if len(entry) > 2 and entry[2] is not None:
+                frameData["wrist"] = entry[2]
             landmarksData.append(frameData)
-
-        # Save to JSON file
         with open(filePath, "w") as f:
             json.dump(
                 {"markerStart": self.markerStart, "markerEnd": self.markerEnd, "frames": landmarksData}, f, indent=2
@@ -306,7 +313,8 @@ class HandAnnotation:
                 timestamp = frameData["timestamp"]
                 # Flatten landmarks are stored as one hand
                 hands = [frameData["landmarks"]]
-                self.handLandmarksTimestamped.append((timestamp, hands))
+                wrist = frameData.get("wrist", None)
+                self.handLandmarksTimestamped.append((timestamp, hands, wrist))
 
             print(f"{GREEN}✓{ENDC} Loaded {len(self.handLandmarksTimestamped)} frames from '{filePath}'")
             return self.handLandmarksTimestamped
@@ -445,7 +453,9 @@ class HandAnnotation:
 
             timestampSeconds = frameIdx / fps
             if timestampSeconds >= nextSampleTime:
-                self.handLandmarksTimestamped.append([timestampSeconds, self.handLandmarksList])
+                self.handLandmarksTimestamped.append(
+                    [timestampSeconds, self.handLandmarksList, list(self.currentWristPositions)]
+                )
                 nextSampleTime += self.SAMPLING_RATE
 
             frameIdx += 1

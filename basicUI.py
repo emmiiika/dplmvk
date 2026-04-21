@@ -583,7 +583,8 @@ class Window(QtWidgets.QWidget):
                 timestamp = time.time() - self.startTime
                 if timestamp >= self.nextSampleTime:
                     self.userLandmarksTimestamped.append(
-                        (timestamp, copy.deepcopy(self.webcamAnnotation.handLandmarksList))
+                        (timestamp, copy.deepcopy(self.webcamAnnotation.handLandmarksList),
+                         list(self.webcamAnnotation.currentWristPositions))
                     )
                     self.nextSampleTime += self.SAMPLING_RATE
 
@@ -820,8 +821,12 @@ class Window(QtWidgets.QWidget):
         outFile = os.path.join(self.ANNOTATED_FOLDER, "webcam_userLandmarks.json")
 
         userData = []
-        for timestamp, landmarks in self.userLandmarksTimestamped:
-            userData.append({"timestamp": round(timestamp, 3), "landmarks": landmarks})
+        for frame in self.userLandmarksTimestamped:
+            timestamp, landmarks = frame[0], frame[1]
+            entry = {"timestamp": round(timestamp, 3), "landmarks": landmarks}
+            if len(frame) > 2:
+                entry["wrist"] = frame[2]
+            userData.append(entry)
 
         with open(outFile, "w") as f:
             json.dump(userData, f, indent=2)

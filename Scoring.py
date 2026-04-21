@@ -104,59 +104,91 @@ class Scoring:
 
         # Optionally add wrist trajectory similarity
         if includeWristTrajectory:
-            userWrist = self._extractWristTrajectory(self.webcamAnnotation)
-            refWrist = self._extractWristTrajectory(self.referenceAnnotation)
-            # Remove None values and align lengths
-            userWrist = [w for w in userWrist if w[0] is not None]
-            refWrist = [w for w in refWrist if w[0] is not None]
-            minLen = min(len(userWrist), len(refWrist))
-            userWrist = userWrist[:minLen]
-            refWrist = refWrist[:minLen]
+            userWrist0, userWrist1 = self._extractWristTrajectory(self.webcamAnnotation)
+            refWrist0, refWrist1 = self._extractWristTrajectory(self.referenceAnnotation)
+            minLen = min(len(userWrist0), len(refWrist0))
             if minLen > 2:
-                # Compute DTW and Euclidean distance for wrist trajectory
-                wristArr1 = np.array(userWrist)
-                wristArr2 = np.array(refWrist)
-                dtwDist, _ = self._dtwWithPath(
-                    [w.reshape(1, 3) for w in wristArr1], [w.reshape(1, 3) for w in wristArr2]
-                )
+                # Build per-frame two-hand wrist tuples; hand weights come from
+                # how often each wrist is present in the reference trajectory.
+                def toArr(pt):
+                    return np.array(pt, dtype=float).reshape(1, 3) if pt is not None else None
+
+                seq1 = [(toArr(userWrist0[i]), toArr(userWrist1[i])) for i in range(minLen)]
+                seq2 = [(toArr(refWrist0[i]), toArr(refWrist1[i])) for i in range(minLen)]
+
+                # Derive hand weights from reference wrist presence.
+                pres0 = sum(1 for p in refWrist0[:minLen] if p is not None)
+                pres1 = sum(1 for p in refWrist1[:minLen] if p is not None)
+                presSum = pres0 + pres1
+                wristHandWeights = [pres0 / presSum, pres1 / presSum] if presSum > 0 else [0.5, 0.5]
+
+                dtwDist, _ = self._dtwWithPath(seq1, seq2, handWeights=wristHandWeights)
                 dtwSim = self._distanceToSimilarity(dtwDist, maxPossibleDistance=1.0)
-                euclDist = np.mean(np.linalg.norm(wristArr1 - wristArr2, axis=1))
-                euclSim = self._distanceToSimilarity(euclDist, maxPossibleDistance=1.0)
+
+                # Per-hand Euclidean distance, weighted by presence.
+                euclSims = []
+                for wristHandIdx, (uTraj, rTraj) in enumerate([(userWrist0, refWrist0), (userWrist1, refWrist1)]):
+                    w = wristHandWeights[wristHandIdx]
+                    if w <= 0:
+                        continue
+                    pairs = [(u, r) for u, r in zip(uTraj[:minLen], rTraj[:minLen]) if u is not None and r is not None]
+                    if pairs:
+                        dists = [np.linalg.norm(np.array(u) - np.array(r)) for u, r in pairs]
+                        euclSims.append(w * self._distanceToSimilarity(float(np.mean(dists)), maxPossibleDistance=1.0))
+                euclSim = (
+                    sum(euclSims) / sum(wristHandWeights[i] for i in range(2) if wristHandWeights[i] > 0 and euclSims)
+                    if euclSims
+                    else 0.0
+                )
+
                 wristScore = 0.6 * dtwSim + 0.4 * euclSim
                 print(
                     f"Wrist DTW similarity: {dtwSim:.4f}, Euclidean similarity: {euclSim:.4f}, Combined: {wristScore:.4f}"
                 )
-                # Combine with hand shape score
                 score = (1 - wristWeight) * score + wristWeight * wristScore
         print(f"Calculated similarity score: {score:.4f}")
         return score
 
     def _extractWristTrajectory(self, annotation):
-        """Extract the wrist (landmark 0) trajectory from an annotation object.
+        """Extract wrist trajectories for both hands from an annotation.
 
-        Prefers `wristTrajectoryList` if present on the annotation; otherwise falls
-        back to extracting landmark 0 of the first hand from `handLandmarksTimestamped`.
+        Reads raw (pre-normalization) wrist positions stored as the 3rd element of
+        each entry in ``handLandmarksTimestamped`` (populated by HandAnnotation when
+        the JSON file was generated with wrist data).
 
         Args:
             annotation: A HandAnnotation instance (webcam or reference).
 
         Returns:
-            List of [x, y, z] positions, one per frame.  Frames where no hand was
-            detected contain [None, None, None].
+            Tuple (traj0, traj1) where each is a list of [x, y, z] per frame.
+            Frames where a hand was not detected contain None.
         """
-        # Try to get wristTrajectoryList if present, else fallback to extracting from handLandmarksTimestamped
-        if hasattr(annotation, "wristTrajectoryList") and annotation.wristTrajectoryList:
-            return annotation.wristTrajectoryList
-        # Fallback: extract from timestamped landmarks (first hand only)
-        result = []
+        traj0 = []  # type: ignore
+        traj1 = []  # type: ignore
         for frame in getattr(annotation, "handLandmarksTimestamped", []):
-            # frame: (timestamp, [hands...]) or dict
-            hands = frame[1] if isinstance(frame, (tuple, list)) and len(frame) > 1 else frame.get("landmarks", [])
-            if hands and len(hands) > 0 and len(hands[0]) > 0:
-                wrist = hands[0][0]  # Assume wrist is first landmark
-                result.append([wrist["x"], wrist["y"], wrist["z"]])
-            else:
-                result.append([None, None, None])
+            # frame[2] is the list of raw wrist positions per hand (or absent in old files)
+            wrists = frame[2] if isinstance(frame, (tuple, list)) and len(frame) > 2 else None
+            for idx, traj in enumerate([traj0, traj1]):
+                if wrists is not None and len(wrists) > idx and wrists[idx] is not None:
+                    traj.append(wrists[idx])
+                else:
+                    traj.append(None)
+        return traj0, traj1
+
+    def _extractRawWristSequences(self, sequence):
+        """Extract per-frame raw wrist positions from a timestamped landmark sequence.
+
+        Returns a list of (wrist0, wrist1) tuples where each wrist is [x,y,z] or None.
+        """
+        result = []
+        for frame in sequence:
+            wrists = frame[2] if isinstance(frame, (tuple, list)) and len(frame) > 2 else None
+            if wrists is None:
+                result.append((None, None))
+                continue
+            w0 = wrists[0] if len(wrists) > 0 else None
+            w1 = wrists[1] if len(wrists) > 1 else None
+            result.append((w0, w1))
         return result
 
     def _calculateSequenceSimilarity(self, userSequence, referenceSequence):
@@ -172,6 +204,10 @@ class Scoring:
         """
         # Score only within the active reference interval marked on the progress bar.
         referenceSequence = self._trimReferenceSequenceByMarkers(referenceSequence)
+
+        # Extract raw (pre-normalization) wrist positions for displacement penalty.
+        rawUserWrists = self._extractRawWristSequences(userSequence)
+        rawRefWrists = self._extractRawWristSequences(referenceSequence)
 
         # Extract per-frame hand arrays: each frame is (hand0_array_or_None, hand1_array_or_None)
         userFrames = self._extractPerHandArrays(userSequence)
@@ -197,7 +233,7 @@ class Scoring:
 
         # Method 1: DTW for temporal alignment — produces the warping path
         # used to align frames for Euclidean and Cosine metrics.
-        dtwDistance, warpingPath = self._dtwWithPath(userFrames, refFrames, handWeights)
+        _, warpingPath = self._dtwWithPath(userFrames, refFrames, handWeights)
 
         # Reindex both sequences according to the DTW warping path so that
         # Euclidean and Cosine metrics compare temporally matched frames.
@@ -230,6 +266,25 @@ class Scoring:
             expectedUserMotion = referenceMotionEnergy * s["activityThreshold"]
             if expectedUserMotion > 0:
                 activityFactor = max(0.0, min(1.0, userMotionEnergy / expectedUserMotion))
+
+        # Wrist max-displacement penalty:
+        # If the reference wrist travels far from its starting position (e.g. hand
+        # moves to the eye for 'oko'), but the user wrist barely moves (static user
+        # or jitter), penalise.  This works even for gestures that return to the
+        # start (net displacement = 0) because we use the *maximum* displacement
+        # at any point during the sequence, not start-to-end.
+        # Only applied when refMaxDisp is large enough that the reference is a
+        # moving gesture — static pose gestures naturally have small refMaxDisp.
+        refMaxDisp = self._wristMaxDispFromRawSeq(rawRefWrists, handWeights)
+        if refMaxDisp is not None and refMaxDisp > 0.05:
+            userMaxDisp = self._wristMaxDispFromRawSeq(rawUserWrists, handWeights)
+            if userMaxDisp is not None:
+                displacementFactor = min(1.0, userMaxDisp / refMaxDisp)
+            else:
+                displacementFactor = 0.0
+            activityFactor *= displacementFactor
+            userDispStr = f"{userMaxDisp:.3f}" if userMaxDisp is not None else "None"
+            print(f"  Wrist max-disp (user/ref): {userDispStr}/{refMaxDisp:.3f}, factor: {displacementFactor:.3f}")
 
         combinedScore *= activityFactor
 
@@ -519,13 +574,81 @@ class Scoring:
         # Median is robust to outlier spikes from tracker glitches.
         return float(np.median(energies))
 
+    def _wristMaxDispFromRawSeq(self, rawSeq, handWeights):
+        """Compute weighted maximum wrist displacement from raw wrist sequences.
+
+        Args:
+            rawSeq: List of (wrist0, wrist1) tuples, each wrist is [x,y,z] or None.
+            handWeights: [weight_hand0, weight_hand1].
+
+        Returns:
+            float >= 0, or None if no wrist data is available.
+        """
+        total = 0.0
+        weightSum = 0.0
+        for idx in (0, 1):
+            w = handWeights[idx]
+            if w <= 0:
+                continue
+            traj = [pair[idx] for pair in rawSeq]
+            d = self._wristMaxDisplacement(traj)
+            if d is not None:
+                total += w * d
+                weightSum += w
+        return total / weightSum if weightSum > 0 else None
+
+    def _wristMaxDisplacement(self, traj):
+        """Compute the maximum wrist displacement from the starting position.
+
+        Returns the largest distance from the first valid point to any later
+        point in the trajectory.  This captures gestures that move away from
+        the start and return (net displacement = 0) while still being large.
+
+        Args:
+            traj: List of [x, y, z] array-likes. None entries are skipped.
+
+        Returns:
+            float >= 0, or None if fewer than 2 valid points.
+        """
+        pts = [p for p in traj if p is not None]
+        if len(pts) < 2:
+            return None
+        origin = np.array(pts[0], dtype=float)
+        dists = [np.linalg.norm(np.array(p, dtype=float) - origin).item() for p in pts[1:]]
+        return float(max(dists))
+
+    def _weightedWristMaxDisplacement(self, frames, handWeights):
+        """Compute hand-weighted average maximum wrist displacement.
+
+        Extracts wrist positions (landmark 0) from per-frame hand arrays and
+        returns the weighted average of per-hand max displacement.
+
+        Args:
+            frames: Sequence of per-frame tuples (hand0, hand1), each an ndarray
+                    of shape (21, 3) or None.
+            handWeights: [weight_hand0, weight_hand1].
+
+        Returns:
+            float >= 0, or None if no wrist data is available.
+        """
+        total = 0.0
+        weightSum = 0.0
+        for idx in (0, 1):
+            w = handWeights[idx]
+            if w <= 0:
+                continue
+            traj = [frame[idx][0] if frame[idx] is not None else None for frame in frames]
+            d = self._wristMaxDisplacement(traj)
+            if d is not None:
+                total += w * d
+                weightSum += w
+        return total / weightSum if weightSum > 0 else None
+
     def _buildDtwMatrix(self, seq1, seq2, handWeights):
         """Fill and return the DTW cost matrix for two sequences.
 
         Args:
-            seq1, seq2: Either:
-                - lists of per-frame tuples (hand0, hand1), or
-                - lists of ndarray landmarks (backward-compatible mode)
+            seq1, seq2: Lists of per-frame tuples (hand0, hand1).
             handWeights: [weight_hand0, weight_hand1] for per-hand mode
 
         Returns:
@@ -548,12 +671,7 @@ class Scoring:
                 left = seq1[i - 1]
                 right = seq2[j - 1]
 
-                # Backward-compatible mode: plain ndarray sequence.
-                if isinstance(left, np.ndarray) and isinstance(right, np.ndarray):
-                    cost = self._euclideanDistance(left, right)
-                else:
-                    # Per-hand mode.
-                    cost = self._weightedFrameDistance(left, right, handWeights)
+                cost = self._weightedFrameDistance(left, right, handWeights)
 
                 # Best predecessor: insertion, deletion, or diagonal match.
                 dtwMatrix[i, j] = cost + min(
@@ -568,9 +686,7 @@ class Scoring:
         """Compute DTW distance and the optimal warping path between two sequences.
 
         Args:
-            seq1, seq2: Either:
-                - lists of per-frame tuples (hand0, hand1), or
-                - lists of ndarray landmarks (backward-compatible mode)
+            seq1, seq2: Lists of per-frame tuples (hand0, hand1).
             handWeights: [weight_hand0, weight_hand1] for per-hand mode
 
         Returns:

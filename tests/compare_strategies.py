@@ -153,6 +153,15 @@ def score_pair(user_path, ref_path, strategy_name):
         if expected > 0:
             activity = max(0.0, min(1.0, user_energy / expected))
 
+    # Wrist max-displacement penalty (mirrors _calculateSequenceSimilarity)
+    raw_ref = scorer._extractRawWristSequences(trimmed_ref)
+    raw_user = scorer._extractRawWristSequences(user_seq)
+    ref_max_disp = scorer._wristMaxDispFromRawSeq(raw_ref, hand_weights)
+    if ref_max_disp is not None and ref_max_disp > 0.05:
+        user_max_disp = scorer._wristMaxDispFromRawSeq(raw_user, hand_weights)
+        disp_factor = min(1.0, user_max_disp / ref_max_disp) if user_max_disp is not None else 0.0
+        activity *= disp_factor
+
     final = combined * activity
 
     return {
