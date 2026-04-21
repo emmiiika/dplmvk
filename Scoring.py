@@ -193,18 +193,24 @@ class Scoring:
 
         s = self.strategy
 
-        # Method 1: DTW for temporal alignment (handles different speeds)
-        dtwDistance = self._dtwDistance(userFrames, refFrames, handWeights)
+        # Method 1: DTW for temporal alignment — also produces the warping path
+        # used to align frames for Euclidean and Cosine metrics.
+        dtwDistance, warpingPath = self._dtwWithPath(userFrames, refFrames, handWeights)
         dtwSimilarity = self._distanceToSimilarity(dtwDistance, maxPossibleDistance=s["dtwMaxDistance"])
 
-        # Method 2: Average Euclidean distance between corresponding frames
-        euclideanDistance = self._averageEuclideanDistance(userFrames, refFrames, handWeights)
+        # Reindex both sequences according to the DTW warping path so that
+        # Euclidean and Cosine metrics compare temporally matched frames.
+        alignedUserFrames = [userFrames[i] for (i, j) in warpingPath]
+        alignedRefFrames = [refFrames[j] for (i, j) in warpingPath]
+
+        # Method 2: Average Euclidean distance on DTW-aligned frames
+        euclideanDistance = self._averageEuclideanDistance(alignedUserFrames, alignedRefFrames, handWeights)
         euclideanSimilarity = self._distanceToSimilarity(
             euclideanDistance, maxPossibleDistance=s["euclideanMaxDistance"]
         )
 
-        # Method 3: Cosine similarity for pose comparison
-        cosineSim = self._averageCosineSimilarity(userFrames, refFrames, handWeights)
+        # Method 3: Cosine similarity on DTW-aligned frames
+        cosineSim = self._averageCosineSimilarity(alignedUserFrames, alignedRefFrames, handWeights)
 
         # Combine metrics with weights.
         combinedScore = (
@@ -526,12 +532,29 @@ class Scoring:
         Returns:
             float: Length-normalized DTW distance (lower = more similar)
         """
+        distance, _ = self._dtwWithPath(seq1, seq2, handWeights)
+        return distance
+
+    def _dtwWithPath(self, seq1, seq2, handWeights=None):
+        """Compute DTW distance and the optimal warping path between two sequences.
+
+        Args:
+            seq1, seq2: Either:
+                - lists of per-frame tuples (hand0, hand1), or
+                - lists of ndarray landmarks (backward-compatible mode)
+            handWeights: [weight_hand0, weight_hand1] for per-hand mode
+
+        Returns:
+            Tuple (distance, path) where distance is the length-normalized DTW
+            distance and path is a list of (i, j) index pairs (0-indexed into
+            seq1 and seq2) tracing the optimal alignment from start to end.
+        """
         n = len(seq1)
         m = len(seq2)
 
         # Empty sequences cannot be aligned.
         if n == 0 or m == 0:
-            return float("inf")
+            return float("inf"), []
 
         if handWeights is None:
             handWeights = [0.5, 0.5]
@@ -560,8 +583,28 @@ class Scoring:
                     dtwMatrix[i - 1, j - 1],  # match
                 )
 
-        # Divide by (n + m) to scale the DTW cost, ensuring longer sequences do not automatically result in higher distances.
-        return dtwMatrix[n, m] / (n + m)
+        # Divide by (n + m) to normalize for sequence length.
+        distance = dtwMatrix[n, m] / (n + m)
+
+        # Backtrack from (n, m) to (1, 1) to recover the optimal warping path.
+        path = []
+        i, j = n, m
+        while i > 0 and j > 0:
+            path.append((i - 1, j - 1))  # store as 0-indexed
+            diag = dtwMatrix[i - 1, j - 1]
+            ins = dtwMatrix[i - 1, j]
+            de = dtwMatrix[i, j - 1]
+            best = min(diag, ins, de)
+            if best == diag:
+                i -= 1
+                j -= 1
+            elif best == ins:
+                i -= 1
+            else:
+                j -= 1
+        path.reverse()
+
+        return distance, path
 
     def _euclideanDistance(self, landmarks1, landmarks2):
         """
