@@ -116,7 +116,9 @@ class Scoring:
                 # Compute DTW and Euclidean distance for wrist trajectory
                 wristArr1 = np.array(userWrist)
                 wristArr2 = np.array(refWrist)
-                dtwDist = self._dtwDistance([w.reshape(1, 3) for w in wristArr1], [w.reshape(1, 3) for w in wristArr2])
+                dtwDist, _ = self._dtwWithPath(
+                    [w.reshape(1, 3) for w in wristArr1], [w.reshape(1, 3) for w in wristArr2]
+                )
                 dtwSim = self._distanceToSimilarity(dtwDist, maxPossibleDistance=1.0)
                 euclDist = np.mean(np.linalg.norm(wristArr1 - wristArr2, axis=1))
                 euclSim = self._distanceToSimilarity(euclDist, maxPossibleDistance=1.0)
@@ -215,7 +217,8 @@ class Scoring:
         euclideanCosineWeight = s["euclideanWeight"] + s["cosineWeight"]
         combinedScore = (
             (s["euclideanWeight"] * euclideanSimilarity + s["cosineWeight"] * cosineSim) / euclideanCosineWeight
-            if euclideanCosineWeight > 0 else 0.0
+            if euclideanCosineWeight > 0
+            else 0.0
         )
 
         # Motion-activity penalty:
@@ -516,12 +519,8 @@ class Scoring:
         # Median is robust to outlier spikes from tracker glitches.
         return float(np.median(energies))
 
-    def _dtwDistance(self, seq1, seq2, handWeights=None):
-        """
-        Calculate Dynamic Time Warping distance between two sequences.
-
-        DTW finds optimal alignment between sequences of different lengths,
-        allowing for different gesture speeds.
+    def _buildDtwMatrix(self, seq1, seq2, handWeights):
+        """Fill and return the DTW cost matrix for two sequences.
 
         Args:
             seq1, seq2: Either:
@@ -530,34 +529,14 @@ class Scoring:
             handWeights: [weight_hand0, weight_hand1] for per-hand mode
 
         Returns:
-            float: Length-normalized DTW distance (lower = more similar)
-        """
-        distance, _ = self._dtwWithPath(seq1, seq2, handWeights)
-        return distance
-
-    def _dtwWithPath(self, seq1, seq2, handWeights=None):
-        """Compute DTW distance and the optimal warping path between two sequences.
-
-        Args:
-            seq1, seq2: Either:
-                - lists of per-frame tuples (hand0, hand1), or
-                - lists of ndarray landmarks (backward-compatible mode)
-            handWeights: [weight_hand0, weight_hand1] for per-hand mode
-
-        Returns:
-            Tuple (distance, path) where distance is the length-normalized DTW
-            distance and path is a list of (i, j) index pairs (0-indexed into
-            seq1 and seq2) tracing the optimal alignment from start to end.
+            np.ndarray of shape (n+1, m+1) with accumulated DTW costs,
+            or None if either sequence is empty.
         """
         n = len(seq1)
         m = len(seq2)
 
-        # Empty sequences cannot be aligned.
         if n == 0 or m == 0:
-            return float("inf"), []
-
-        if handWeights is None:
-            handWeights = [0.5, 0.5]
+            return None
 
         # Initialize DP table with infinity; (0,0) is the alignment origin.
         dtwMatrix = np.full((n + 1, m + 1), float("inf"))
@@ -583,7 +562,30 @@ class Scoring:
                     dtwMatrix[i - 1, j - 1],  # match
                 )
 
-        # Divide by (n + m) to normalize for sequence length.
+        return dtwMatrix
+
+    def _dtwWithPath(self, seq1, seq2, handWeights=None):
+        """Compute DTW distance and the optimal warping path between two sequences.
+
+        Args:
+            seq1, seq2: Either:
+                - lists of per-frame tuples (hand0, hand1), or
+                - lists of ndarray landmarks (backward-compatible mode)
+            handWeights: [weight_hand0, weight_hand1] for per-hand mode
+
+        Returns:
+            Tuple (distance, path) where distance is the length-normalized DTW
+            distance and path is a list of (i, j) index pairs (0-indexed into
+            seq1 and seq2) tracing the optimal alignment from start to end.
+        """
+        if handWeights is None:
+            handWeights = [0.5, 0.5]
+
+        dtwMatrix = self._buildDtwMatrix(seq1, seq2, handWeights)
+        if dtwMatrix is None:
+            return float("inf"), []
+
+        n, m = len(seq1), len(seq2)
         distance = dtwMatrix[n, m] / (n + m)
 
         # Backtrack from (n, m) to (1, 1) to recover the optimal warping path.

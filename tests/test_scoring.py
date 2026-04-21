@@ -199,7 +199,7 @@ def test_individual_metrics():
     seq1 = [landmarks1, landmarks1, landmarks1]
     seq2 = [landmarks1, landmarks2, landmarks3]
 
-    dtw_dist = scoring._dtwDistance(seq1, seq2)
+    dtw_dist, _ = scoring._dtwWithPath(seq1, seq2)
     print(f"\nDTW distance between sequences: {dtw_dist:.6f}")
 
     print("\n✓ Individual metrics working correctly!")

@@ -141,7 +141,11 @@ def score_pair(user_path, ref_path, strategy_name):
 
     eucl_sim = scorer._distanceToSimilarity(eucl_dist, maxPossibleDistance=s["euclideanMaxDistance"])
     eucl_cos_weight = s["euclideanWeight"] + s["cosineWeight"]
-    combined = (s["euclideanWeight"] * eucl_sim + s["cosineWeight"] * cos_sim) / eucl_cos_weight if eucl_cos_weight > 0 else 0.0
+    combined = (
+        (s["euclideanWeight"] * eucl_sim + s["cosineWeight"] * cos_sim) / eucl_cos_weight
+        if eucl_cos_weight > 0
+        else 0.0
+    )
 
     activity = 1.0
     if ref_energy > 0.003:

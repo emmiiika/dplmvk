@@ -81,7 +81,7 @@ def summarize_similarity(scorer, user_sequence, reference_sequence):
 
     hand_weights = scorer._calculateHandMotionWeights(reference_frames)
 
-    dtw_distance = scorer._dtwDistance(user_frames, reference_frames, hand_weights)
+    dtw_distance, _ = scorer._dtwWithPath(user_frames, reference_frames, hand_weights)
     euclidean_distance = scorer._averageEuclideanDistance(user_frames, reference_frames, hand_weights)
     cosine_similarity = scorer._averageCosineSimilarity(user_frames, reference_frames, hand_weights)
     final_score = scorer.calculateScore(user_sequence)
