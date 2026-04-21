@@ -18,15 +18,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-sys.path.insert(0, os.path.dirname(__file__))
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_CODE_DIR = os.path.dirname(_SCRIPT_DIR)          # …/code/
+sys.path.insert(0, _CODE_DIR)
 
 from HandAnnotation import HandAnnotation
 from Scoring import Scoring
 from LandmarkIndices import LandmarkIndices
 
-REFERENCE_FOLDER = "../videa"
-ANNOTATED_FOLDER = "../videa/.annotated"
-RECORDED_FOLDER = "../videa/.recorded"
+REFERENCE_FOLDER = os.path.join(_CODE_DIR, "../videa")
+ANNOTATED_FOLDER = os.path.join(_CODE_DIR, "../videa/.annotated")
+RECORDED_FOLDER  = os.path.join(_CODE_DIR, "../videa/.recorded")
 
 
 # ── Annotation loading (same logic as compare_strategies.py) ─────────────────
@@ -114,19 +116,27 @@ def dtw_with_path(scorer, seq1, seq2, hand_weights):
 # ── Visualization helpers ─────────────────────────────────────────────────────
 
 
-def motion_energy(frames):
-    """Per-frame motion energy (frame-to-frame mean landmark displacement)."""
-    energies = [0.0]
-    for i in range(1, len(frames)):
-        energies.append(float(np.mean(np.linalg.norm(frames[i] - frames[i - 1], axis=1))))
-    return np.array(energies)
-
-
 def landmark_trajectory(frames, landmark_idx):
     """Extract (x, y) trajectory of a single landmark across all frames."""
     xs = [f[landmark_idx, 0] for f in frames]
     ys = [f[landmark_idx, 1] for f in frames]
     return np.array(xs), np.array(ys)
+
+
+def per_frame_euclidean(scorer, aligned_user, aligned_ref, hand_weights):
+    """Weighted per-frame Euclidean distance along the DTW-aligned path."""
+    dists = []
+    for u, r in zip(aligned_user, aligned_ref):
+        dists.append(scorer._weightedFrameDistance(u, r, hand_weights))
+    return np.array(dists)
+
+
+def per_frame_cosine(scorer, aligned_user, aligned_ref, hand_weights):
+    """Weighted per-frame cosine similarity (0–1) along the DTW-aligned path."""
+    sims = []
+    for u, r in zip(aligned_user, aligned_ref):
+        sims.append(scorer._weightedFrameCosineSimilarity(u, r, hand_weights))
+    return np.array(sims)
 
 
 # ── Main visualization ────────────────────────────────────────────────────────
@@ -171,6 +181,12 @@ def visualize(user_stem, ref_gesture):
 
     cost_matrix, path = dtw_with_path(scorer, user_frames, ref_frames, hand_weights)
 
+    # DTW-aligned frame pairs for per-frame distance/similarity plots
+    aligned_user = [user_frames[i] for (i, j) in path]
+    aligned_ref = [ref_frames[j] for (i, j) in path]
+    euclid_curve = per_frame_euclidean(scorer, aligned_user, aligned_ref, hand_weights)
+    cosine_curve = per_frame_cosine(scorer, aligned_user, aligned_ref, hand_weights)
+
     # Extract dominant hand as plain (21,3) arrays for energy / trajectory plots
     def dominant(f):
         return f[0] if f[0] is not None else f[1]
@@ -178,24 +194,31 @@ def visualize(user_stem, ref_gesture):
     user_plain = [dominant(f) for f in user_frames]
     ref_plain = [dominant(f) for f in ref_frames]
 
-    user_energy = motion_energy(user_plain)
-    ref_energy = motion_energy(ref_plain)
-
     # Index fingertip (landmark 8) x-coordinate trajectory
     LANDMARK = LandmarkIndices.INDEX_TIP
     user_traj_x, user_traj_y = landmark_trajectory(user_plain, LANDMARK)
     ref_traj_x, ref_traj_y = landmark_trajectory(ref_plain, LANDMARK)
 
+    # Raw wrist trajectory (dominant hand, x/y in screen space)
+    raw_user_wrists = scorer._extractRawWristSequences(user_ann.handLandmarksTimestamped)
+    raw_ref_wrists = scorer._extractRawWristSequences(ref_seq)
+    wrist_hand_idx = 0 if hand_weights[0] >= hand_weights[1] else 1
+    user_wx = [w[wrist_hand_idx][0] for w in raw_user_wrists if w[wrist_hand_idx] is not None]
+    user_wy = [w[wrist_hand_idx][1] for w in raw_user_wrists if w[wrist_hand_idx] is not None]
+    ref_wx  = [w[wrist_hand_idx][0] for w in raw_ref_wrists  if w[wrist_hand_idx] is not None]
+    ref_wy  = [w[wrist_hand_idx][1] for w in raw_ref_wrists  if w[wrist_hand_idx] is not None]
+
     # ── Plot ──────────────────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=(16, 18))
     fig.suptitle(
         f"DTW Alignment: '{user_stem}'  vs  '{ref_gesture}' reference    |    Score: {score_pct:.1f}%",
         fontsize=14,
     )
-    gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.42, wspace=0.35)
+    gs = gridspec.GridSpec(4, 2, figure=fig, hspace=0.55, wspace=0.35,
+                            height_ratios=[1, 1, 1, 1])
 
-    # 1. DTW cost matrix with alignment path
-    ax_dtw = fig.add_subplot(gs[:, 0])
+    # 1. DTW cost matrix with alignment path (spans top 2 rows, left column)
+    ax_dtw = fig.add_subplot(gs[0:2, 0])
     im = ax_dtw.imshow(cost_matrix, origin="lower", aspect="auto", cmap="viridis")
     path_i = [p[0] for p in path]
     path_j = [p[1] for p in path]
@@ -218,37 +241,83 @@ def visualize(user_stem, ref_gesture):
         bbox=dict(boxstyle="round,pad=0.3", facecolor="#333333", alpha=0.8),
     )
 
-    # 2. Motion energy curves with alignment correspondence lines
-    ax_energy = fig.add_subplot(gs[0, 1])
-    ax_energy.plot(user_energy, label=f"User ({user_stem})", color="steelblue")
-    ax_energy.plot(ref_energy, label=f"Reference ({ref_gesture})", color="darkorange")
-
-    # Draw every ~10th alignment correspondence as a faint line
-    step = max(1, len(path) // 30)
-    for pi, pj in path[::step]:
-        ax_energy.annotate(
-            "",
-            xy=(pj, ref_energy[pj]),
-            xytext=(pi, user_energy[pi]),
-            arrowprops=dict(arrowstyle="-", color="gray", alpha=0.3, lw=0.8),
-        )
-
-    ax_energy.set_xlabel("Frame index")
-    ax_energy.set_ylabel("Motion energy")
-    ax_energy.set_title("Per-Frame Motion Energy + DTW Correspondences")
-    ax_energy.legend(fontsize=8)
-
-    # 3. Index fingertip X trajectory
-    ax_x = fig.add_subplot(gs[1, 1])
+    # 2a. Index fingertip X trajectory with DTW correspondences
+    ax_x = fig.add_subplot(gs[0, 1])
     ax_x.plot(user_traj_x, label=f"User ({user_stem})", color="steelblue")
     ax_x.plot(ref_traj_x, label=f"Reference ({ref_gesture})", color="darkorange")
+    step = max(1, len(path) // 30)
+    for pi, pj in path[::step]:
+        if pi < len(user_traj_x) and pj < len(ref_traj_x):
+            ax_x.annotate(
+                "",
+                xy=(pj, ref_traj_x[pj]),
+                xytext=(pi, user_traj_x[pi]),
+                arrowprops=dict(arrowstyle="-", color="gray", alpha=0.3, lw=0.8),
+            )
     ax_x.set_xlabel("Frame index")
     ax_x.set_ylabel("X coordinate (normalized)")
-    ax_x.set_title(f"Index Fingertip X Trajectory (landmark {LANDMARK})")
+    ax_x.set_title(f"Index Fingertip X + DTW Correspondences (lm {LANDMARK})")
     ax_x.legend(fontsize=8)
 
-    plt.savefig(f"dtw_alignment_{user_stem}_vs_{ref_gesture}.png", dpi=130, bbox_inches="tight")
-    print(f"Saved: dtw_alignment_{user_stem}_vs_{ref_gesture}.png")
+    # 2b. Index fingertip Y trajectory with DTW correspondences
+    ax_y = fig.add_subplot(gs[1, 1])
+    ax_y.plot(user_traj_y, label=f"User ({user_stem})", color="steelblue")
+    ax_y.plot(ref_traj_y, label=f"Reference ({ref_gesture})", color="darkorange")
+    for pi, pj in path[::step]:
+        if pi < len(user_traj_y) and pj < len(ref_traj_y):
+            ax_y.annotate(
+                "",
+                xy=(pj, ref_traj_y[pj]),
+                xytext=(pi, user_traj_y[pi]),
+                arrowprops=dict(arrowstyle="-", color="gray", alpha=0.3, lw=0.8),
+            )
+    ax_y.invert_yaxis()  # normalized y=0 is top of frame
+    ax_y.set_xlabel("Frame index")
+    ax_y.set_ylabel("Y coordinate (normalized, inverted)")
+    ax_y.set_title(f"Index Fingertip Y + DTW Correspondences (lm {LANDMARK})")
+    ax_y.legend(fontsize=8)
+
+    # 3. Wrist 2D trajectory (dominant hand, raw screen-space x/y)
+    ax_wrist = fig.add_subplot(gs[2, 0])
+    if user_wx:
+        ax_wrist.plot(user_wx, user_wy, color="steelblue", label=f"User ({user_stem})", linewidth=1.2)
+        ax_wrist.plot(user_wx[0],  user_wy[0],  "o", color="steelblue",  markersize=6)
+        ax_wrist.plot(user_wx[-1], user_wy[-1], "s", color="steelblue",  markersize=6)
+    if ref_wx:
+        ax_wrist.plot(ref_wx,  ref_wy,  color="darkorange", label=f"Reference ({ref_gesture})", linewidth=1.2)
+        ax_wrist.plot(ref_wx[0],  ref_wy[0],  "o", color="darkorange", markersize=6)
+        ax_wrist.plot(ref_wx[-1], ref_wy[-1], "s", color="darkorange", markersize=6)
+    ax_wrist.invert_yaxis()  # screen-space: y=0 is top
+    ax_wrist.set_xlabel("X (screen)")
+    ax_wrist.set_ylabel("Y (screen, inverted)")
+    ax_wrist.set_title(f"Wrist 2D Trajectory (hand {wrist_hand_idx}, ○=start ■=end)")
+    ax_wrist.legend(fontsize=8)
+    ax_wrist.set_aspect("equal", adjustable="datalim")
+
+    # 4. Per-frame Euclidean distance (DTW-aligned)
+    ax_euclid = fig.add_subplot(gs[2, 1])
+    ax_euclid.plot(euclid_curve, color="mediumseagreen")
+    ax_euclid.axhline(np.mean(euclid_curve), color="darkgreen", linestyle="--", linewidth=1,
+                      label=f"mean={np.mean(euclid_curve):.3f}")
+    ax_euclid.set_xlabel("Aligned frame index")
+    ax_euclid.set_ylabel("Weighted distance")
+    ax_euclid.set_title("Per-Frame Euclidean Distance (aligned)")
+    ax_euclid.legend(fontsize=8)
+
+    # 5. Per-frame Cosine similarity (DTW-aligned)
+    ax_cos = fig.add_subplot(gs[3, 0:2])
+    ax_cos.plot(cosine_curve, color="coral")
+    ax_cos.axhline(np.mean(cosine_curve), color="darkred", linestyle="--", linewidth=1,
+                   label=f"mean={np.mean(cosine_curve):.3f}")
+    ax_cos.set_ylim(0, 1)
+    ax_cos.set_xlabel("Aligned frame index")
+    ax_cos.set_ylabel("Cosine similarity (0–1)")
+    ax_cos.set_title("Per-Frame Cosine Similarity (aligned)")
+    ax_cos.legend(fontsize=8)
+
+    out_path = os.path.join(_SCRIPT_DIR, f"dtw_alignment_{user_stem}_vs_{ref_gesture}.png")
+    plt.savefig(out_path, dpi=130, bbox_inches="tight")
+    print(f"Saved: {out_path}")
     plt.close("all")
 
 

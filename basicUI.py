@@ -583,8 +583,11 @@ class Window(QtWidgets.QWidget):
                 timestamp = time.time() - self.startTime
                 if timestamp >= self.nextSampleTime:
                     self.userLandmarksTimestamped.append(
-                        (timestamp, copy.deepcopy(self.webcamAnnotation.handLandmarksList),
-                         list(self.webcamAnnotation.currentWristPositions))
+                        (
+                            timestamp,
+                            copy.deepcopy(self.webcamAnnotation.handLandmarksList),
+                            list(self.webcamAnnotation.currentWristPositions),
+                        )
                     )
                     self.nextSampleTime += self.SAMPLING_RATE
 
