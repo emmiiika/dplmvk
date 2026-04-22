@@ -806,36 +806,51 @@ class Scoring:
         # Return mean distance per frame.
         return totalDistance / minLen
 
+    # MediaPipe hand landmark index groups, one entry per finger/segment.
+    # Each finger is given equal weight in per-finger cosine similarity.
+    _FINGER_GROUPS = [
+        [0],  # wrist
+        [1, 2, 3, 4],  # thumb
+        [5, 6, 7, 8],  # index
+        [9, 10, 11, 12],  # middle
+        [13, 14, 15, 16],  # ring
+        [17, 18, 19, 20],  # pinky
+    ]
+
     def _cosineSimilarity(self, landmarks1, landmarks2):
         """
-        Calculate cosine similarity between two landmark configurations.
+        Calculate per-finger cosine similarity between two landmark configurations.
 
-        Cosine similarity measures the angle between landmark vectors,
-        being more robust to scale differences than Euclidean distance.
+        Each finger group (wrist, thumb, index, middle, ring, pinky) is flattened
+        into its own sub-vector, cosine similarity is computed per group, and the
+        results are averaged. This gives each finger equal weight regardless of
+        landmark count, making the metric more sensitive to individual finger
+        differences than a single global 63D cosine.
 
         Args:
             landmarks1, landmarks2: Numpy arrays of shape (21, 3)
 
         Returns:
-            float: Cosine similarity (-1 to 1, higher = more similar)
+            float: Average per-finger cosine similarity (-1 to 1, higher = more similar)
         """
         if landmarks1.shape != landmarks2.shape:
             return -1.0  # Incompatible shapes cannot be compared.
 
-        # Flatten (21, 3) arrays into 1-D vectors of length 63.
-        vec1 = landmarks1.flatten()
-        vec2 = landmarks2.flatten()
+        sims = []
+        for indices in self._FINGER_GROUPS:
+            vec1 = landmarks1[indices].flatten()
+            vec2 = landmarks2[indices].flatten()
 
-        # cos(θ) = (vec1 · vec2) / (‖vec1‖ * ‖vec2‖)
-        dotProduct = np.dot(vec1, vec2)
-        norm1 = np.linalg.norm(vec1)
-        norm2 = np.linalg.norm(vec2)
+            norm1 = np.linalg.norm(vec1)
+            norm2 = np.linalg.norm(vec2)
 
-        # Zero-length vector has no direction; treat as no similarity.
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
+            if norm1 == 0 or norm2 == 0:
+                sims.append(0.0)
+                continue
 
-        return dotProduct / (norm1 * norm2)
+            sims.append(float(np.dot(vec1, vec2) / (norm1 * norm2)))
+
+        return float(np.mean(sims))
 
     def _weightedFrameCosineSimilarity(self, frame1, frame2, handWeights):
         """Compute weighted per-frame cosine similarity in [0, 1].

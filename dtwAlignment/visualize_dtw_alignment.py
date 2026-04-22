@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_CODE_DIR = os.path.dirname(_SCRIPT_DIR)          # …/code/
+_CODE_DIR = os.path.dirname(_SCRIPT_DIR)  # …/code/
 sys.path.insert(0, _CODE_DIR)
 
 from HandAnnotation import HandAnnotation
@@ -28,7 +28,7 @@ from LandmarkIndices import LandmarkIndices
 
 REFERENCE_FOLDER = os.path.join(_CODE_DIR, "../videa")
 ANNOTATED_FOLDER = os.path.join(_CODE_DIR, "../videa/.annotated")
-RECORDED_FOLDER  = os.path.join(_CODE_DIR, "../videa/.recorded")
+RECORDED_FOLDER = os.path.join(_CODE_DIR, "../videa/.recorded")
 
 
 # ── Annotation loading (same logic as compare_strategies.py) ─────────────────
@@ -205,8 +205,8 @@ def visualize(user_stem, ref_gesture):
     wrist_hand_idx = 0 if hand_weights[0] >= hand_weights[1] else 1
     user_wx = [w[wrist_hand_idx][0] for w in raw_user_wrists if w[wrist_hand_idx] is not None]
     user_wy = [w[wrist_hand_idx][1] for w in raw_user_wrists if w[wrist_hand_idx] is not None]
-    ref_wx  = [w[wrist_hand_idx][0] for w in raw_ref_wrists  if w[wrist_hand_idx] is not None]
-    ref_wy  = [w[wrist_hand_idx][1] for w in raw_ref_wrists  if w[wrist_hand_idx] is not None]
+    ref_wx = [w[wrist_hand_idx][0] for w in raw_ref_wrists if w[wrist_hand_idx] is not None]
+    ref_wy = [w[wrist_hand_idx][1] for w in raw_ref_wrists if w[wrist_hand_idx] is not None]
 
     # ── Plot ──────────────────────────────────────────────────────────────────
     fig = plt.figure(figsize=(16, 18))
@@ -214,8 +214,7 @@ def visualize(user_stem, ref_gesture):
         f"DTW Alignment: '{user_stem}'  vs  '{ref_gesture}' reference    |    Score: {score_pct:.1f}%",
         fontsize=14,
     )
-    gs = gridspec.GridSpec(4, 2, figure=fig, hspace=0.55, wspace=0.35,
-                            height_ratios=[1, 1, 1, 1])
+    gs = gridspec.GridSpec(4, 2, figure=fig, hspace=0.55, wspace=0.35, height_ratios=[1, 1, 1, 1])
 
     # 1. DTW cost matrix with alignment path (spans top 2 rows, left column)
     ax_dtw = fig.add_subplot(gs[0:2, 0])
@@ -281,11 +280,11 @@ def visualize(user_stem, ref_gesture):
     ax_wrist = fig.add_subplot(gs[2, 0])
     if user_wx:
         ax_wrist.plot(user_wx, user_wy, color="steelblue", label=f"User ({user_stem})", linewidth=1.2)
-        ax_wrist.plot(user_wx[0],  user_wy[0],  "o", color="steelblue",  markersize=6)
-        ax_wrist.plot(user_wx[-1], user_wy[-1], "s", color="steelblue",  markersize=6)
+        ax_wrist.plot(user_wx[0], user_wy[0], "o", color="steelblue", markersize=6)
+        ax_wrist.plot(user_wx[-1], user_wy[-1], "s", color="steelblue", markersize=6)
     if ref_wx:
-        ax_wrist.plot(ref_wx,  ref_wy,  color="darkorange", label=f"Reference ({ref_gesture})", linewidth=1.2)
-        ax_wrist.plot(ref_wx[0],  ref_wy[0],  "o", color="darkorange", markersize=6)
+        ax_wrist.plot(ref_wx, ref_wy, color="darkorange", label=f"Reference ({ref_gesture})", linewidth=1.2)
+        ax_wrist.plot(ref_wx[0], ref_wy[0], "o", color="darkorange", markersize=6)
         ax_wrist.plot(ref_wx[-1], ref_wy[-1], "s", color="darkorange", markersize=6)
     ax_wrist.invert_yaxis()  # screen-space: y=0 is top
     ax_wrist.set_xlabel("X (screen)")
@@ -297,8 +296,9 @@ def visualize(user_stem, ref_gesture):
     # 4. Per-frame Euclidean distance (DTW-aligned)
     ax_euclid = fig.add_subplot(gs[2, 1])
     ax_euclid.plot(euclid_curve, color="mediumseagreen")
-    ax_euclid.axhline(np.mean(euclid_curve), color="darkgreen", linestyle="--", linewidth=1,
-                      label=f"mean={np.mean(euclid_curve):.3f}")
+    ax_euclid.axhline(
+        np.mean(euclid_curve), color="darkgreen", linestyle="--", linewidth=1, label=f"mean={np.mean(euclid_curve):.3f}"
+    )
     ax_euclid.set_xlabel("Aligned frame index")
     ax_euclid.set_ylabel("Weighted distance")
     ax_euclid.set_title("Per-Frame Euclidean Distance (aligned)")
@@ -307,8 +307,9 @@ def visualize(user_stem, ref_gesture):
     # 5. Per-frame Cosine similarity (DTW-aligned)
     ax_cos = fig.add_subplot(gs[3, 0:2])
     ax_cos.plot(cosine_curve, color="coral")
-    ax_cos.axhline(np.mean(cosine_curve), color="darkred", linestyle="--", linewidth=1,
-                   label=f"mean={np.mean(cosine_curve):.3f}")
+    ax_cos.axhline(
+        np.mean(cosine_curve), color="darkred", linestyle="--", linewidth=1, label=f"mean={np.mean(cosine_curve):.3f}"
+    )
     ax_cos.set_ylim(0, 1)
     ax_cos.set_xlabel("Aligned frame index")
     ax_cos.set_ylabel("Cosine similarity (0–1)")

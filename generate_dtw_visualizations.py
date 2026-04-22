@@ -1,4 +1,5 @@
 """Batch-generate DTW alignment visualizations for all video pairs."""
+
 import sys
 import os
 
@@ -9,29 +10,29 @@ from dtwAlignment.visualize_dtw_alignment import visualize
 
 PAIRS = [
     # Matching gestures
-    ("d_oko",       "oko"),
-    ("d_oko_left",  "oko_left"),
-    ("d_oko_side",  "oko_side"),
-    ("d_dom",       "dom"),
-    ("d_slovo",     "slovo"),
-    ("e_oko",       "oko"),
-    ("e_oko_left",  "oko_left"),
-    ("e_oko_side",  "oko_side"),
-    ("e_dom",       "dom"),
-    ("e_slovo",     "slovo"),
+    ("d_oko", "oko"),
+    ("d_oko_left", "oko_left"),
+    ("d_oko_side", "oko_side"),
+    ("d_dom", "dom"),
+    ("d_slovo", "slovo"),
+    ("e_oko", "oko"),
+    ("e_oko_left", "oko_left"),
+    ("e_oko_side", "oko_side"),
+    ("e_dom", "dom"),
+    ("e_slovo", "slovo"),
     # Static user
-    ("d_nic",       "oko"),
-    ("d_nic",       "oko_left"),
-    ("d_nic",       "oko_side"),
-    ("d_nic",       "dom"),
-    ("d_nic",       "slovo"),
+    ("d_nic", "oko"),
+    ("d_nic", "oko_left"),
+    ("d_nic", "oko_side"),
+    ("d_nic", "dom"),
+    ("d_nic", "slovo"),
     # Cross-gesture
-    ("d_oko",       "slovo"),
-    ("d_slovo",     "oko"),
-    ("e_oko",       "dom"),
-    ("e_dom",       "oko"),
-    ("d_dom",       "slovo"),
-    ("e_slovo",     "dom"),
+    ("d_oko", "slovo"),
+    ("d_slovo", "oko"),
+    ("e_oko", "dom"),
+    ("e_dom", "oko"),
+    ("d_dom", "slovo"),
+    ("e_slovo", "dom"),
 ]
 
 out_dir = os.path.join(ROOT, "dtw_visualizations")
