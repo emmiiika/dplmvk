@@ -18,7 +18,7 @@ ANNOTATED_FOLDER = "../videa/.annotated"
 RECORDED_FOLDER = "../videa/.recorded"
 
 # Reference gestures available (stem names matching .mp4 files in REFERENCE_FOLDER)
-GESTURES = ["oko", "oko_left", "oko_side", "dom", "slovo"]
+GESTURES = ["oko", "oko_left", "oko_side", "dom", "slovo", "hrad", "hrad_2", "hrad_side", "pes", "pes_side"]
 
 # Map recorded filename stems to the reference gesture they attempted.
 # Naming convention: {user}_{gesture}[_variant].avi
@@ -34,6 +34,12 @@ MATCHING_PAIRS = [
     ("e_oko_side", "oko_side"),
     ("e_dom", "dom"),
     ("e_slovo", "slovo"),
+    ("e_hrad_1", "hrad"),
+    ("e_hrad_2", "hrad"),
+    ("e_hrad_side", "hrad_side"),
+    ("e_pes", "pes"),
+    ("e_pes_side_1", "pes_side"),
+    ("e_pes_side_2", "pes_side"),
 ]
 
 # Static user (does nothing) — compare against every reference
@@ -47,6 +53,10 @@ CROSS_PAIRS = [
     ("e_dom", "oko"),
     ("d_dom", "slovo"),
     ("e_slovo", "dom"),
+    ("e_hrad_1", "dom"),
+    ("e_hrad_1", "pes"),
+    ("e_pes", "hrad"),
+    ("e_pes", "dom"),
 ]
 
 
