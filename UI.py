@@ -129,10 +129,10 @@ class Window(QtWidgets.QWidget):
     Uses PySide6 for UI components and OpenCV for frame capture and annotation.
     """
 
-    FOLDER = "../videa/"  # Path to the folder containing reference videos
-    ANNOTATED_FOLDER = "../videa/.annotated/"  # Path to save annotated reference videos
+    REFERENCE_FOLDER = "./videos/referenceVideos/"  # Path to the folder containing reference videos
+    ANNOTATED_FOLDER = "./videos/.annotated/"  # Path to save annotated reference videos
     SAMPLING_RATE = 1.0 / 30.0  # seconds (30 FPS) for collecting user landmarks during tracking
-    RECORDING_PATH = "../videa/.recorded/user_recording.avi"
+    RECORDING_PATH = "./videos/.recorded/user_recording.avi"
 
     def __init__(self):
         """Initialize the main application window with video dimensions and UI components, trigger setup methods."""
@@ -639,12 +639,14 @@ class Window(QtWidgets.QWidget):
         sorted alphabetically.  The main queue contains one entry per gesture; the arrows
         above the reference video let the user cycle through variants within a gesture.
         """
-        if not os.path.exists(self.FOLDER) or not os.path.isdir(self.FOLDER):
-            print(f"{FAIL}Error{ENDC}: folder does not exist or is not a directory: {self.FOLDER}")
+        if not os.path.exists(self.REFERENCE_FOLDER) or not os.path.isdir(self.REFERENCE_FOLDER):
+            print(f"{FAIL}Error{ENDC}: folder does not exist or is not a directory: {self.REFERENCE_FOLDER}")
             return []
 
-        allFiles = os.listdir(self.FOLDER)
-        videoFiles = [f for f in allFiles if not f.startswith(".") and os.path.isfile(os.path.join(self.FOLDER, f))]
+        allFiles = os.listdir(self.REFERENCE_FOLDER)
+        videoFiles = [
+            f for f in allFiles if not f.startswith(".") and os.path.isfile(os.path.join(self.REFERENCE_FOLDER, f))
+        ]
 
         def _baseName(stem):
             for suffix in self.VARIANT_SUFFIXES:
@@ -663,7 +665,7 @@ class Window(QtWidgets.QWidget):
         for f in videoFiles:
             stem, _ = os.path.splitext(f)
             base = _baseName(stem)
-            groups.setdefault(base, []).append(os.path.join(self.FOLDER, f))
+            groups.setdefault(base, []).append(os.path.join(self.REFERENCE_FOLDER, f))
 
         sortedGroups = [sorted(paths, key=_variantKey) for paths in groups.values()]
         random.shuffle(sortedGroups)
@@ -676,11 +678,18 @@ class Window(QtWidgets.QWidget):
 
         self.variantIndex = variantIndex
 
-        # Cancel any in-progress annotation worker
+        # Cancel any in-progress annotation worker.
+        # NOTE: QThread.quit() is a no-op when run() has no Qt event loop, so wait()
+        # would block the main thread for the full annotation duration. Instead, we
+        # disconnect the signal and move the worker to an orphan list; it will finish
+        # its video write in the background and the result will be cached on disk.
         if hasattr(self, "_annotationWorker") and self._annotationWorker is not None:
             self._annotationWorker.finished.disconnect()
-            self._annotationWorker.quit()
-            self._annotationWorker.wait()
+            if not hasattr(self, "_orphanedWorkers"):
+                self._orphanedWorkers = []
+            self._orphanedWorkers.append(self._annotationWorker)
+            # Prune workers that have already finished
+            self._orphanedWorkers = [w for w in self._orphanedWorkers if w.isRunning()]
             self._annotationWorker = None
 
         path = self.videoQueue[groupIndex][variantIndex]
@@ -700,11 +709,22 @@ class Window(QtWidgets.QWidget):
         basename, ext = os.path.splitext(filename)
         annotatedPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
 
-        if os.path.isfile(annotatedPath):
-            # Already annotated — load landmarks from cache and continue immediately
+        landmarksPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated_handLandmarks.json")
+        cacheValid = os.path.isfile(annotatedPath) and os.path.isfile(landmarksPath)
+
+        if cacheValid:
+            # Both annotated video and landmarks exist — load from cache immediately
             self.annotateReferenceVideo(path)
             self._finishLoading(path, annotatedPath)
         else:
+            # Delete orphaned annotated video if landmarks are missing (prevents
+            # annotateReferenceVideo from falling back to a synchronous annotation run)
+            if os.path.isfile(annotatedPath):
+                try:
+                    os.remove(annotatedPath)
+                    print(f"{WARNING}Removed orphaned annotated video (missing landmarks): '{annotatedPath}'{ENDC}")
+                except OSError as e:
+                    print(f"{FAIL}Could not remove orphaned annotated video: {e}{ENDC}")
             # Need to annotate — show loading screen and offload to background thread
             self._pendingPath = path
             self._pendingAnnotatedPath = annotatedPath
@@ -714,7 +734,16 @@ class Window(QtWidgets.QWidget):
                 self.refTimer.stop()
             self.isTracking = False
             self.userLandmarksTimestamped = []
-            for b in (self.btnPrev, self.btnPlayPause, self.btnNext, self.btnVariantPrev, self.btnVariantNext):
+            for b in (
+                self.btnPrev,
+                self.btnPlayPause,
+                self.btnNext,
+                self.btnVariantPrev,
+                self.btnVariantNext,
+                self.btnSpeedDown,
+                self.btnSpeedUp,
+                self.btnAnnotations,
+            ):
                 b.setEnabled(False)
             if hasattr(self, "refProgressBar"):
                 self.refProgressBar.reset()
@@ -755,7 +784,16 @@ class Window(QtWidgets.QWidget):
             self.refStack.setCurrentIndex(0)
         if hasattr(self, "refTimer"):
             self.refTimer.start(int(1000 / BASE_FPS))
-        for b in (self.btnPrev, self.btnPlayPause, self.btnNext, self.btnVariantPrev, self.btnVariantNext):
+        for b in (
+            self.btnPrev,
+            self.btnPlayPause,
+            self.btnNext,
+            self.btnVariantPrev,
+            self.btnVariantNext,
+            self.btnSpeedDown,
+            self.btnSpeedUp,
+            self.btnAnnotations,
+        ):
             b.setEnabled(True)
         print(f"{GREEN}✓{ENDC} Annotation complete, starting playback.")
 
