@@ -13,9 +13,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from HandAnnotation import HandAnnotation
 from Scoring import Scoring, SCORING_STRATEGIES
 
+
 REFERENCE_FOLDER = "../videa"
 ANNOTATED_FOLDER = "../videa/.annotated"
 RECORDED_FOLDER = "../videa/.recorded"
+
+# ---- Scoring config ----
+# Set these for batch runs to control wrist trajectory blending
+INCLUDE_WRIST_TRAJECTORY = True  # Set True to enable wrist trajectory blending
+WRIST_WEIGHT = 0.1  # Default blend weight for wrist trajectory (matches UI)
 
 # Reference gestures available (stem names matching .mp4 files in REFERENCE_FOLDER)
 GESTURES = ["oko", "oko_left", "oko_side", "dom", "slovo", "hrad", "hrad_2", "hrad_side", "pes", "pes_side"]
@@ -119,69 +125,44 @@ def score_pair(user_path, ref_path, strategy_name):
     user_seq = user_ann.handLandmarksTimestamped
     ref_seq = ref_ann.handLandmarksTimestamped
 
+    # Calculate the main score using the unified scoring logic
+    score = scorer.calculateScore(
+        userLandmarks=user_seq, includeWristTrajectory=INCLUDE_WRIST_TRAJECTORY, wristWeight=WRIST_WEIGHT
+    )
+
+    # For reporting, extract additional metrics (DTW, Euclidean, Cosine, activity, wrist displacement)
+    # These are for diagnostics only and do not affect the main score
     trimmed_ref = scorer._trimReferenceSequenceByMarkers(ref_seq)
     user_frames = scorer._extractPerHandArrays(user_seq)
     ref_frames = scorer._extractPerHandArrays(trimmed_ref)
-
-    if len(user_frames) == 0 or len(ref_frames) == 0:
-        return {
-            "score": 0.0,
-            "dtw_dist": float("inf"),
-            "eucl_dist": float("inf"),
-            "cos_sim": 0.0,
-            "activity": 0.0,
-            "u_frames": len(user_frames),
-            "r_frames": len(ref_frames),
-        }
-
     hand_weights = scorer._calculateHandMotionWeights(ref_frames)
-    ref_energy = scorer._averageMotionEnergy(ref_frames, hand_weights)
-    user_energy = scorer._averageMotionEnergy(user_frames, hand_weights)
-
-    # Trim idle/jitter frames from edges of user sequence (matches _calculateSequenceSimilarity)
-    user_frames = scorer._trimLowMotionEdges(user_frames, hand_weights)
-
-    s = scorer.strategy
     dtw_dist, warping_path = scorer._dtwWithPath(user_frames, ref_frames, hand_weights)
     aligned_user = [user_frames[i] for (i, j) in warping_path]
     aligned_ref = [ref_frames[j] for (i, j) in warping_path]
-
     eucl_dist = scorer._averageEuclideanDistance(aligned_user, aligned_ref, hand_weights)
     cos_sim = scorer._averageCosineSimilarity(aligned_user, aligned_ref, hand_weights)
-
-    eucl_sim = scorer._distanceToSimilarity(eucl_dist, maxPossibleDistance=s["euclideanMaxDistance"])
-    eucl_cos_weight = s["euclideanWeight"] + s["cosineWeight"]
-    combined = (
-        (s["euclideanWeight"] * eucl_sim + s["cosineWeight"] * cos_sim) / eucl_cos_weight
-        if eucl_cos_weight > 0
-        else 0.0
-    )
-
+    ref_energy = scorer._averageMotionEnergy(ref_frames, hand_weights)
+    user_energy = scorer._averageMotionEnergy(user_frames, hand_weights)
     activity = 1.0
     if ref_energy > 0.003:
-        expected = ref_energy * s["activityThreshold"]
+        expected = ref_energy * scorer.strategy["activityThreshold"]
         if expected > 0:
             activity = max(0.0, min(1.0, user_energy / expected))
-
-    # Wrist max-displacement penalty (mirrors _calculateSequenceSimilarity)
     raw_ref = scorer._extractRawWristSequences(trimmed_ref)
     raw_user = scorer._extractRawWristSequences(user_seq)
     ref_max_disp = scorer._wristMaxDispFromRawSeq(raw_ref, hand_weights)
-    if ref_max_disp is not None and ref_max_disp > 0.05:
-        user_max_disp = scorer._wristMaxDispFromRawSeq(raw_user, hand_weights)
-        disp_factor = min(1.0, user_max_disp / ref_max_disp) if user_max_disp is not None else 0.0
-        activity *= disp_factor
-
-    final = combined * activity
+    user_max_disp = scorer._wristMaxDispFromRawSeq(raw_user, hand_weights)
 
     return {
-        "score": final,
+        "score": score,
         "dtw_dist": dtw_dist,
         "eucl_dist": eucl_dist,
         "cos_sim": cos_sim,
         "activity": activity,
         "u_frames": len(user_frames),
         "r_frames": len(ref_frames),
+        "wrist_user": user_max_disp if user_max_disp is not None else 0.0,
+        "wrist_ref": ref_max_disp if ref_max_disp is not None else 0.0,
     }
 
 
@@ -189,18 +170,18 @@ def score_pair(user_path, ref_path, strategy_name):
 
 STRATEGIES = list(SCORING_STRATEGIES.keys())
 
-SEP = "-" * 130
+SEP = "-" * 152
 
 
 def print_header(title):
-    print(f"\n{'=' * 130}")
+    print(f"\n{'=' * 152}")
     print(f"  {title}")
-    print(f"{'=' * 130}")
+    print(f"{'=' * 152}")
 
 
 def print_table_header():
     print(
-        f"{'User Video':<20} {'Reference':<12} {'Strategy':<20} {'Score%':>7} {'DTW dist':>9} {'Eucl dist':>10} {'Cos sim':>8} {'Activity':>9} {'Frames':>10}"
+        f"{'User Video':<20} {'Reference':<12} {'Strategy':<20} {'Score%':>7} {'DTW dist':>9} {'Eucl dist':>10} {'Cos sim':>8} {'Activity':>9} {'W.usr':>6} {'W.ref':>6} {'Frames':>10}"
     )
     print(SEP)
 
@@ -208,7 +189,7 @@ def print_table_header():
 def print_row(user_stem, ref_gesture, strategy, m):
     frames_str = f"{m['u_frames']}/{m['r_frames']}"
     print(
-        f"{user_stem:<20} {ref_gesture:<12} {strategy:<20} {m['score']*100:6.1f}% {m['dtw_dist']:9.4f} {m['eucl_dist']:10.4f} {m['cos_sim']:8.4f} {m['activity']:9.3f} {frames_str:>10}"
+        f"{user_stem:<20} {ref_gesture:<12} {strategy:<20} {m['score']*100:6.1f}% {m['dtw_dist']:9.4f} {m['eucl_dist']:10.4f} {m['cos_sim']:8.4f} {m['activity']:9.3f} {m['wrist_user']:6.3f} {m['wrist_ref']:6.3f} {frames_str:>10}"
     )
 
 
@@ -235,6 +216,7 @@ def main():
                     "Frames used",
                     "Motion energy",
                     "Activity factor",
+                    "Wrist max-disp",
                     "DTW similarity",
                     "Euclidean similarity",
                     "Cosine similarity",

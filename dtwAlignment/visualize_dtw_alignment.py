@@ -143,6 +143,10 @@ def per_frame_cosine(scorer, aligned_user, aligned_ref, hand_weights):
 
 
 def visualize(user_stem, ref_gesture):
+    return visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix="wrist_off")
+
+
+def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix=None):
     for ext in (".mp4", ".avi"):
         candidate = os.path.abspath(os.path.join(RECORDED_FOLDER, f"{user_stem}{ext}"))
         if os.path.isfile(candidate):
@@ -157,7 +161,6 @@ def visualize(user_stem, ref_gesture):
     print(f"Loading reference: {ref_path}")
     ref_ann = load_annotation(ref_path)
 
-    # Use the exact same frame extraction + trimming as the scorer
     scorer = Scoring(user_ann, ref_ann, strategy="original")
     ref_seq = scorer._trimReferenceSequenceByMarkers(ref_ann.handLandmarksTimestamped)
     user_frames = scorer._extractPerHandArrays(user_ann.handLandmarksTimestamped)
@@ -174,7 +177,7 @@ def visualize(user_stem, ref_gesture):
 
     score = scorer.calculateScore(
         userLandmarks=user_ann.handLandmarksTimestamped,
-        includeWristTrajectory=False,
+        includeWristTrajectory=includeWristTrajectory,
     )
     score_pct = score * 100
     print(f"Score: {score_pct:.1f}%")
@@ -316,7 +319,8 @@ def visualize(user_stem, ref_gesture):
     ax_cos.set_title("Per-Frame Cosine Similarity (aligned)")
     ax_cos.legend(fontsize=8)
 
-    out_path = os.path.join(_SCRIPT_DIR, f"dtw_alignment_{user_stem}_vs_{ref_gesture}.png")
+    suffix = f"_{output_suffix}" if output_suffix else ""
+    out_path = os.path.join(_SCRIPT_DIR, f"dtw_alignment_{user_stem}_vs_{ref_gesture}{suffix}.png")
     plt.savefig(out_path, dpi=130, bbox_inches="tight")
     print(f"Saved: {out_path}")
     plt.close("all")

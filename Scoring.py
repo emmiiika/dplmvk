@@ -69,7 +69,7 @@ class Scoring:
         self.strategy = SCORING_STRATEGIES[strategy]
         print(f"Scoring strategy: {strategy}")
 
-    def calculateScore(self, userLandmarks=None, includeWristTrajectory=True, wristWeight=0.3):
+    def calculateScore(self, userLandmarks=None, includeWristTrajectory=True, wristWeight=0.1):
         """Calculate similarity score between user landmarks and reference landmarks.
 
         Args:
@@ -108,33 +108,49 @@ class Scoring:
             refWrist0, refWrist1 = self._extractWristTrajectory(self.referenceAnnotation)
             minLen = min(len(userWrist0), len(refWrist0))
             if minLen > 2:
-                # Build per-frame two-hand wrist tuples; hand weights come from
-                # how often each wrist is present in the reference trajectory.
-                def toArr(pt):
-                    return np.array(pt, dtype=float).reshape(1, 3) if pt is not None else None
-
-                seq1 = [(toArr(userWrist0[i]), toArr(userWrist1[i])) for i in range(minLen)]
-                seq2 = [(toArr(refWrist0[i]), toArr(refWrist1[i])) for i in range(minLen)]
-
-                # Derive hand weights from reference wrist presence.
+                # Derive hand weights from reference wrist presence (uses absolute positions).
                 pres0 = sum(1 for p in refWrist0[:minLen] if p is not None)
                 pres1 = sum(1 for p in refWrist1[:minLen] if p is not None)
                 presSum = pres0 + pres1
                 wristHandWeights = [pres0 / presSum, pres1 / presSum] if presSum > 0 else [0.5, 0.5]
 
-                dtwDist, _ = self._dtwWithPath(seq1, seq2, handWeights=wristHandWeights)
-                dtwSim = self._distanceToSimilarity(dtwDist, maxPossibleDistance=1.0)
+                # Convert absolute positions to per-frame displacement vectors so the
+                # comparison measures movement pattern, not screen location.
+                def toDeltas(traj):
+                    deltas = []
+                    for i in range(1, len(traj)):
+                        prev, curr = traj[i - 1], traj[i]
+                        if prev is not None and curr is not None:
+                            deltas.append(np.array(curr, dtype=float) - np.array(prev, dtype=float))
+                        else:
+                            deltas.append(None)
+                    return deltas
 
-                # Per-hand Euclidean distance, weighted by presence.
+                uDelta0 = toDeltas(userWrist0[:minLen])
+                uDelta1 = toDeltas(userWrist1[:minLen])
+                rDelta0 = toDeltas(refWrist0[:minLen])
+                rDelta1 = toDeltas(refWrist1[:minLen])
+                deltaLen = len(uDelta0)  # minLen - 1
+
+                def toArr(pt):
+                    return pt.reshape(1, 3) if pt is not None else None
+
+                seq1 = [(toArr(uDelta0[i]), toArr(uDelta1[i])) for i in range(deltaLen)]
+                seq2 = [(toArr(rDelta0[i]), toArr(rDelta1[i])) for i in range(deltaLen)]
+
+                dtwDist, _ = self._dtwWithPath(seq1, seq2, handWeights=wristHandWeights)
+                dtwSim = self._distanceToSimilarity(dtwDist, maxPossibleDistance=0.05)
+
+                # Per-hand mean delta distance, weighted by presence.
                 euclSims = []
-                for wristHandIdx, (uTraj, rTraj) in enumerate([(userWrist0, refWrist0), (userWrist1, refWrist1)]):
+                for wristHandIdx, (uDelta, rDelta) in enumerate([(uDelta0, rDelta0), (uDelta1, rDelta1)]):
                     w = wristHandWeights[wristHandIdx]
                     if w <= 0:
                         continue
-                    pairs = [(u, r) for u, r in zip(uTraj[:minLen], rTraj[:minLen]) if u is not None and r is not None]
+                    pairs = [(u, r) for u, r in zip(uDelta, rDelta) if u is not None and r is not None]
                     if pairs:
-                        dists = [np.linalg.norm(np.array(u) - np.array(r)) for u, r in pairs]
-                        euclSims.append(w * self._distanceToSimilarity(float(np.mean(dists)), maxPossibleDistance=1.0))
+                        dists = [np.linalg.norm(u - r) for u, r in pairs]
+                        euclSims.append(w * self._distanceToSimilarity(float(np.mean(dists)), maxPossibleDistance=0.05))
                 euclSim = (
                     sum(euclSims) / sum(wristHandWeights[i] for i in range(2) if wristHandWeights[i] > 0 and euclSims)
                     if euclSims

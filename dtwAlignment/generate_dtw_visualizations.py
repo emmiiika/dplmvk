@@ -6,7 +6,7 @@ import os
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from dtwAlignment.visualize_dtw_alignment import visualize
+from dtwAlignment.visualize_dtw_alignment import visualize_with_options
 
 PAIRS = [
     # Matching gestures
@@ -43,9 +43,15 @@ os.chdir(ROOT)
 for user_stem, ref_gesture in PAIRS:
     print(f"\n=== {user_stem} vs {ref_gesture} ===")
     try:
-        visualize(user_stem, ref_gesture)
-        png = f"dtw_alignment_{user_stem}_vs_{ref_gesture}.png"
-        if os.path.isfile(png):
-            os.rename(png, os.path.join(out_dir, png))
+        # Wrist trajectory OFF
+        visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix="wrist_off")
+        png_off = f"dtw_alignment_{user_stem}_vs_{ref_gesture}_wrist_off.png"
+        if os.path.isfile(png_off):
+            os.rename(png_off, os.path.join(out_dir, png_off))
+        # Wrist trajectory ON
+        visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=True, output_suffix="wrist_on")
+        png_on = f"dtw_alignment_{user_stem}_vs_{ref_gesture}_wrist_on.png"
+        if os.path.isfile(png_on):
+            os.rename(png_on, os.path.join(out_dir, png_on))
     except Exception as e:
         print(f"ERROR: {e}")
