@@ -63,13 +63,66 @@ class HandAnnotation:
         self.wristTrajectoryList = []  # Store original wrist positions for each hand and frame
         self.currentWristPositions = []  # Original wrist [x,y,z] per hand for the latest frame
 
-    def getHandLandmarks(self):
-        """Return the list of detected hand landmarks from the most recent detection result."""
-        return self.handLandmarksList
+    # ------------------------------------------------------------------
+    # Landmark processing helpers
+    # ------------------------------------------------------------------
 
-    def setHandLandmarks(self, handLandmarksList):
-        """Set the list of detected hand landmarks."""
-        self.handLandmarksList = handLandmarksList
+    def _getTranslatedLandmarks(self, handLandmarks):
+        """Return wrist-centered landmark numpy array for one hand.
+
+        Args:
+            handLandmarks: List of Landmark objects for one hand.
+        """
+        coords = np.array([[lm.x, lm.y, lm.z] for lm in handLandmarks])
+        if coords.shape[0] == 0:
+            return coords
+        wrist = coords[LandmarkIndices.WRIST]  # Use wrist as origin of the hand coordinate system
+        translatedCoords = coords - wrist
+        return translatedCoords
+
+    def _getNormalizedScaleLandmarks(self, translatedCoords):
+        """Normalize landmarks by hand size to be invariant to distance from camera.
+
+        Uses the distance from wrist to middle finger MCP (middle knuckle) as the scale reference.
+        This is robust and consistent across different hand sizes and distances.
+
+        Args:
+            translatedCoords: Numpy array of wrist-centered landmarks (21 x 3).
+
+        Returns:
+            Numpy array of scale-normalized landmarks, or original if scale is 0.
+        """
+        wrist = translatedCoords[LandmarkIndices.WRIST]
+        middleMCP = translatedCoords[LandmarkIndices.MIDDLE_MCP]
+        scale = np.linalg.norm(middleMCP - wrist)  # Euclidean distance from wrist to middle MCP as hand size reference
+
+        # Avoid division by zero if hand is not detected or scale is extremely small
+        if scale == 0:
+            return translatedCoords
+
+        normalized_coords = translatedCoords / scale
+        return normalized_coords
+
+    def _landmarksToDict(self, handLandmarksList):
+        """Convert hand landmarks to dictionary format (x, y, z coordinates only).
+
+        Args:
+            handLandmarksList: List of lists of Landmark objects or NormalizedLandmark objects.
+
+        Returns:
+            List of lists of dictionaries with x, y, z keys.
+        """
+        handLandmarksDict = []
+        for hand in handLandmarksList:
+            handData = [
+                {"x": float(landmark[0]), "y": float(landmark[1]), "z": float(landmark[2])} for landmark in hand
+            ]
+            handLandmarksDict.append(handData)
+        return handLandmarksDict
+
+    # ------------------------------------------------------------------
+    # Landmark extraction and drawing
+    # ------------------------------------------------------------------
 
     def extractHandLandmarkProtos(self, detectionResult):
         """Convert MediaPipe detection landmarks into NormalizedLandmarkList protos for drawing."""
@@ -146,6 +199,10 @@ class HandAnnotation:
 
         return annotatedImage
 
+    # ------------------------------------------------------------------
+    # Frame processing
+    # ------------------------------------------------------------------
+
     def convertFrameToQtImage(self, rgbFrame):
         """Convert an RGB OpenCV frame to Qt QImage format.
 
@@ -187,6 +244,15 @@ class HandAnnotation:
         normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]
         self.handLandmarksList = self._landmarksToDict(normalized)
 
+        # Always update raw wrist positions so scoring has them even when drawing is off.
+        original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in detectionResult.hand_landmarks]
+        self.currentWristPositions = []
+        for coords in original_coords:
+            if coords.shape[0] > LandmarkIndices.WRIST:
+                self.currentWristPositions.append(coords[LandmarkIndices.WRIST].tolist())
+            else:
+                self.currentWristPositions.append(None)
+
         if drawAnnotations:
             outputImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
         else:
@@ -196,6 +262,10 @@ class HandAnnotation:
             return self.convertFrameToQtImage(outputImage)
         else:
             return cv2.cvtColor(outputImage, cv2.COLOR_RGB2BGR)
+
+    # ------------------------------------------------------------------
+    # Landmark serialization
+    # ------------------------------------------------------------------
 
     def saveLandmarksToFile(self, outputPath):
         """Save the detected hand landmarks to a JSON file for later analysis and easy loading.
@@ -226,59 +296,6 @@ class HandAnnotation:
                 {"markerStart": self.markerStart, "markerEnd": self.markerEnd, "frames": landmarksData}, f, indent=2
             )
         print(f"{GREEN}✓{ENDC} Landmarks saved to '{filePath}'")
-
-    def _getTranslatedLandmarks(self, handLandmarks):
-        """Return wrist-centered landmark numpy array for one hand.
-
-        Args:
-            handLandmarks: List of Landmark objects for one hand.
-        """
-        coords = np.array([[lm.x, lm.y, lm.z] for lm in handLandmarks])
-        if coords.shape[0] == 0:
-            return coords
-        wrist = coords[LandmarkIndices.WRIST]  # Use wrist as origin of the hand coordinate system
-        translatedCoords = coords - wrist
-        return translatedCoords
-
-    def _getNormalizedScaleLandmarks(self, translatedCoords):
-        """Normalize landmarks by hand size to be invariant to distance from camera.
-
-        Uses the distance from wrist to middle finger MCP (middle knuckle) as the scale reference.
-        This is robust and consistent across different hand sizes and distances.
-
-        Args:
-            translatedCoords: Numpy array of wrist-centered landmarks (21 x 3).
-
-        Returns:
-            Numpy array of scale-normalized landmarks, or original if scale is 0.
-        """
-        wrist = translatedCoords[LandmarkIndices.WRIST]
-        middleMCP = translatedCoords[LandmarkIndices.MIDDLE_MCP]
-        scale = np.linalg.norm(middleMCP - wrist)  # Euclidean distance from wrist to middle MCP as hand size reference
-
-        # Avoid division by zero if hand is not detected or scale is extremely small
-        if scale == 0:
-            return translatedCoords
-
-        normalized_coords = translatedCoords / scale
-        return normalized_coords
-
-    def _landmarksToDict(self, handLandmarksList):
-        """Convert hand landmarks to dictionary format (x, y, z coordinates only).
-
-        Args:
-            handLandmarksList: List of lists of Landmark objects or NormalizedLandmark objects.
-
-        Returns:
-            List of lists of dictionaries with x, y, z keys.
-        """
-        handLandmarksDict = []
-        for hand in handLandmarksList:
-            handData = [
-                {"x": float(landmark[0]), "y": float(landmark[1]), "z": float(landmark[2])} for landmark in hand
-            ]
-            handLandmarksDict.append(handData)
-        return handLandmarksDict
 
     def loadLandmarksFromFile(self, filePath):
         """Load timestamped hand landmarks from a JSON file.
@@ -324,6 +341,10 @@ class HandAnnotation:
         except Exception as e:
             print(f"{FAIL}Error{ENDC}: Failed to load landmarks: {e}")
             return None
+
+    # ------------------------------------------------------------------
+    # Video annotation
+    # ------------------------------------------------------------------
 
     def _findActiveFrameRange(self, videoPath, fps):
         """Fast first pass: find first and last frame with significant hand movement.
