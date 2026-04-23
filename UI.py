@@ -132,7 +132,20 @@ class Window(QtWidgets.QWidget):
     REFERENCE_FOLDER = "./videos/referenceVideos/"  # Path to the folder containing reference videos
     ANNOTATED_FOLDER = "./videos/.annotated/"  # Path to save annotated reference videos
     SAMPLING_RATE = 1.0 / 30.0  # seconds (30 FPS) for collecting user landmarks during tracking
-    RECORDING_PATH = "./videos/.recorded/user_recording.avi"
+    RECORDING_PATH = "./videos/.recorded/user_recording.avi"  # Path to save the last recorded webcam video (overwrite)
+    # Known variant suffixes — longer (compound) suffixes must come first so _baseName
+    # strips them correctly before checking shorter ones.
+    # Browse order within a gesture group matches the tuple order (basic variant always first).
+    VARIANT_SUFFIXES = ("_right_side", "_left_side", "_both_side", "_right", "_left", "_both")
+    VARIANT_LABELS = {
+        "_right_side": "pravá, zboku",
+        "_left_side": "ľavá, zboku",
+        "_both_side": "obe, zboku",
+        "_right": "pravá",
+        "_left": "ľavá",
+        "_both": "obe",
+    }
+    VARIANT_LABEL_BASIC = ""  # fallback for files without a recognised suffix
 
     def __init__(self):
         """Initialize the main application window with video dimensions and UI components, trigger setup methods."""
@@ -532,6 +545,10 @@ class Window(QtWidgets.QWidget):
         self.refTimer.setInterval(interval)
         print(f"{BLUE}Reference video speed set to {speed:.2g}× ({interval} ms/frame).{ENDC}")
 
+    # ------------------------------------------------------------------
+    # Video processing and playback
+    # ------------------------------------------------------------------
+
     def displayVideoStream(self):
         """Capture a frame from the webcam (or playback file), annotate, and display in the UI.
 
@@ -629,9 +646,6 @@ class Window(QtWidgets.QWidget):
 
         return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
 
-    # Known variant suffixes (order defines browse order within a group)
-    VARIANT_SUFFIXES = ("_left", "_side")
-
     def _buildVideoQueue(self):
         """Scan FOLDER, group files by gesture name, return a shuffled list of variant-groups.
 
@@ -655,10 +669,20 @@ class Window(QtWidgets.QWidget):
             return stem
 
         def _variantKey(path):
+            # Sort order within a gesture group: front views before side views,
+            # right before left before both. Basic (no suffix) falls back to (0, stem).
+            _SORT_ORDER = {
+                "_right": 1,
+                "_left": 2,
+                "_both": 3,
+                "_right_side": 4,
+                "_left_side": 5,
+                "_both_side": 6,
+            }
             stem = os.path.splitext(os.path.basename(path))[0]
-            for i, suffix in enumerate(self.VARIANT_SUFFIXES):
+            for suffix in self.VARIANT_SUFFIXES:
                 if stem.endswith(suffix):
-                    return (i + 1, stem)
+                    return (_SORT_ORDER[suffix], stem)
             return (0, stem)  # basic variant sorts first
 
         groups = {}  # type: ignore
@@ -764,12 +788,13 @@ class Window(QtWidgets.QWidget):
         numVariants = len(self.videoQueue[self.videoQueueIndex]) if self.videoQueue else 1
         if numVariants > 1:
             currentStem = os.path.splitext(os.path.basename(path))[0]
-            variantLabel = " (basic)"
+            variantLabel = self.VARIANT_LABEL_BASIC
             for suffix in self.VARIANT_SUFFIXES:
                 if currentStem.endswith(suffix):
-                    variantLabel = f" ({suffix[1:]})"
+                    variantLabel = self.VARIANT_LABELS[suffix]
                     break
-            self.gestureName.setText(stem + variantLabel)
+            label = f"{stem} ({variantLabel})" if variantLabel else stem
+            self.gestureName.setText(label)
         else:
             self.gestureName.setText(stem)
         self.btnVariantPrev.setVisible(numVariants > 1)
