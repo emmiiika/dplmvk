@@ -132,7 +132,7 @@ class Window(QtWidgets.QWidget):
     REFERENCE_FOLDER = "./videos/referenceVideos/"  # Path to the folder containing reference videos
     ANNOTATED_FOLDER = "./videos/.annotated/"  # Path to save annotated reference videos
     SAMPLING_RATE = 1.0 / 30.0  # seconds (30 FPS) for collecting user landmarks during tracking
-    RECORDING_PATH = "./videos/.recorded/user_recording.avi"  # Path to save the last recorded webcam video (overwrite)
+    RECORDING_PATH = "./videos/.recorded/user_recording.mp4"  # Path to save the last recorded webcam video (overwrite)
     # Known variant suffixes — longer (compound) suffixes must come first so _baseName
     # strips them correctly before checking shorter ones.
     # Browse order within a gesture group matches the tuple order (basic variant always first).
@@ -208,6 +208,76 @@ class Window(QtWidgets.QWidget):
     # ------------------------------------------------------------------
     # UI setup
     # ------------------------------------------------------------------
+
+    def _buildControlPanel(self):
+        """Build and return the control panel widget with all playback/record buttons."""
+        panel = QtWidgets.QWidget()
+        panel.setStyleSheet("background-color: #1e1e30; border-radius: 10px; padding: 4px;")
+
+        btnStyle = (
+            "QPushButton {"
+            "  background-color: #2e2e50; color: #e0e0e0;"
+            "  border: 1px solid #444466; border-radius: 6px;"
+            "  padding: 6px 14px; font-size: 18px;"
+            "}"
+            "QPushButton:hover { background-color: #3e3e70; }"
+            "QPushButton:pressed { background-color: #555590; }"
+            "QPushButton:checked { background-color: #4a4a90; border: 1px solid #8888cc; }"
+            "QPushButton:disabled { background-color: #1e1e30; color: #555566; border: 1px solid #333344; }"
+        )
+
+        def btn(text, tooltip):
+            b = QtWidgets.QPushButton(text)
+            b.setToolTip(tooltip)
+            b.setStyleSheet(btnStyle)
+            b.setFixedHeight(42)
+            return b
+
+        self.btnPrev = btn("⏮", "Previous reference video")
+        self.btnPlayPause = btn("⏸", "Pause / Play reference video")
+        self.btnNext = btn("⏭", "Next reference video")
+        self.btnRecord = btn("⏺", "Start / Stop recording")
+        self.btnPlayback = btn("📽", "Play last recorded video")
+        self.btnAnnotations = btn("👁", "Toggle annotation visibility")
+        self.btnAnnotations.setCheckable(True)
+        self.btnAnnotations.setChecked(True)
+
+        # Speed control: [−] [1.0×] [+]
+        self.btnSpeedDown = btn("−", "Decrease playback speed")
+        self.btnSpeedDown.setFixedWidth(36)
+        self.speedLabel = QtWidgets.QLabel(f"{SPEED_STEPS[self.speedIndex]:.2g}×")
+        self.speedLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.speedLabel.setStyleSheet("color: #e0e0e0; font-size: 16px; min-width: 44px;")
+        self.btnSpeedUp = btn("+", "Increase playback speed")
+        self.btnSpeedUp.setFixedWidth(36)
+
+        layout = QtWidgets.QHBoxLayout(panel)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(8)
+        layout.addWidget(self.btnPrev)
+        layout.addWidget(self.btnPlayPause)
+        layout.addWidget(self.btnNext)
+        layout.addSpacing(12)
+        layout.addWidget(self.btnRecord)
+        layout.addWidget(self.btnPlayback)
+        layout.addSpacing(12)
+        layout.addWidget(self.btnAnnotations)
+        layout.addStretch()
+        layout.addWidget(self.btnSpeedDown)
+        layout.addWidget(self.speedLabel)
+        layout.addWidget(self.btnSpeedUp)
+
+        # Connect signals
+        self.btnPrev.clicked.connect(self.onPrevVideo)
+        self.btnPlayPause.clicked.connect(self.onPlayPause)
+        self.btnNext.clicked.connect(self.onNextVideo)
+        self.btnRecord.clicked.connect(self.onRecord)
+        self.btnPlayback.clicked.connect(self.onPlayback)
+        self.btnAnnotations.toggled.connect(self.onToggleAnnotations)
+        self.btnSpeedDown.clicked.connect(self.onSpeedDown)
+        self.btnSpeedUp.clicked.connect(self.onSpeedUp)
+
+        return panel
 
     def setupUi(self):
         """Initialize and arrange UI widgets using a vertical layout with a control panel."""
@@ -331,76 +401,6 @@ class Window(QtWidgets.QWidget):
 
         print(f"{GREEN}✓{ENDC} UI setup complete.")
 
-    def _buildControlPanel(self):
-        """Build and return the control panel widget with all playback/record buttons."""
-        panel = QtWidgets.QWidget()
-        panel.setStyleSheet("background-color: #1e1e30; border-radius: 10px; padding: 4px;")
-
-        btnStyle = (
-            "QPushButton {"
-            "  background-color: #2e2e50; color: #e0e0e0;"
-            "  border: 1px solid #444466; border-radius: 6px;"
-            "  padding: 6px 14px; font-size: 18px;"
-            "}"
-            "QPushButton:hover { background-color: #3e3e70; }"
-            "QPushButton:pressed { background-color: #555590; }"
-            "QPushButton:checked { background-color: #4a4a90; border: 1px solid #8888cc; }"
-            "QPushButton:disabled { background-color: #1e1e30; color: #555566; border: 1px solid #333344; }"
-        )
-
-        def btn(text, tooltip):
-            b = QtWidgets.QPushButton(text)
-            b.setToolTip(tooltip)
-            b.setStyleSheet(btnStyle)
-            b.setFixedHeight(42)
-            return b
-
-        self.btnPrev = btn("⏮", "Previous reference video")
-        self.btnPlayPause = btn("⏸", "Pause / Play reference video")
-        self.btnNext = btn("⏭", "Next reference video")
-        self.btnRecord = btn("⏺", "Start / Stop recording")
-        self.btnPlayback = btn("📽", "Play last recorded video")
-        self.btnAnnotations = btn("👁", "Toggle annotation visibility")
-        self.btnAnnotations.setCheckable(True)
-        self.btnAnnotations.setChecked(True)
-
-        # Speed control: [−] [1.0×] [+]
-        self.btnSpeedDown = btn("−", "Decrease playback speed")
-        self.btnSpeedDown.setFixedWidth(36)
-        self.speedLabel = QtWidgets.QLabel(f"{SPEED_STEPS[self.speedIndex]:.2g}×")
-        self.speedLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.speedLabel.setStyleSheet("color: #e0e0e0; font-size: 16px; min-width: 44px;")
-        self.btnSpeedUp = btn("+", "Increase playback speed")
-        self.btnSpeedUp.setFixedWidth(36)
-
-        layout = QtWidgets.QHBoxLayout(panel)
-        layout.setContentsMargins(10, 6, 10, 6)
-        layout.setSpacing(8)
-        layout.addWidget(self.btnPrev)
-        layout.addWidget(self.btnPlayPause)
-        layout.addWidget(self.btnNext)
-        layout.addSpacing(12)
-        layout.addWidget(self.btnRecord)
-        layout.addWidget(self.btnPlayback)
-        layout.addSpacing(12)
-        layout.addWidget(self.btnAnnotations)
-        layout.addStretch()
-        layout.addWidget(self.btnSpeedDown)
-        layout.addWidget(self.speedLabel)
-        layout.addWidget(self.btnSpeedUp)
-
-        # Connect signals
-        self.btnPrev.clicked.connect(self.onPrevVideo)
-        self.btnPlayPause.clicked.connect(self.onPlayPause)
-        self.btnNext.clicked.connect(self.onNextVideo)
-        self.btnRecord.clicked.connect(self.onRecord)
-        self.btnPlayback.clicked.connect(self.onPlayback)
-        self.btnAnnotations.toggled.connect(self.onToggleAnnotations)
-        self.btnSpeedDown.clicked.connect(self.onSpeedDown)
-        self.btnSpeedUp.clicked.connect(self.onSpeedUp)
-
-        return panel
-
     def setupCamera(self):
         """Initialize webcam capture, configure hand annotation processor, and start refresh timer."""
         self.capture = cv2.VideoCapture(0)
@@ -418,233 +418,8 @@ class Window(QtWidgets.QWidget):
         print(f"{GREEN}✓{ENDC} Camera setup complete.")
 
     # ------------------------------------------------------------------
-    # Control panel callbacks
+    # Video queue and loading
     # ------------------------------------------------------------------
-
-    def onPrevVideo(self):
-        """Navigate to the previous gesture in the queue (resets to basic variant)."""
-        if not self.videoQueue:
-            return
-        self.videoQueueIndex = (self.videoQueueIndex - 1) % len(self.videoQueue)
-        self._loadVideoAtIndex(self.videoQueueIndex)
-
-    def onPlayPause(self):
-        """Toggle pause/play of the reference video."""
-        self.refPaused = not self.refPaused
-        self.btnPlayPause.setText("▶" if self.refPaused else "⏸")
-        print(f"{BLUE}Toggled play/pause.{ENDC}")
-
-    def onNextVideo(self):
-        """Advance to the next gesture in the queue (resets to basic variant)."""
-        if not self.videoQueue:
-            return
-        self.videoQueueIndex = (self.videoQueueIndex + 1) % len(self.videoQueue)
-        self._loadVideoAtIndex(self.videoQueueIndex)
-
-    def onPrevVariant(self):
-        """Show the previous variant of the current gesture."""
-        if not self.videoQueue:
-            return
-        variants = self.videoQueue[self.videoQueueIndex]
-        if len(variants) < 2:
-            return
-        self.variantIndex = (self.variantIndex - 1) % len(variants)
-        self._loadVideoAtIndex(self.videoQueueIndex, self.variantIndex)
-
-    def onNextVariant(self):
-        """Show the next variant of the current gesture."""
-        if not self.videoQueue:
-            return
-        variants = self.videoQueue[self.videoQueueIndex]
-        if len(variants) < 2:
-            return
-        self.variantIndex = (self.variantIndex + 1) % len(variants)
-        self._loadVideoAtIndex(self.videoQueueIndex, self.variantIndex)
-
-    def onRecord(self):
-        """Start or stop recording the webcam stream."""
-        if self.isRecording:
-            self._stopRecording()
-        else:
-            self._startRecording()
-
-    def _startRecording(self):
-        os.makedirs(os.path.dirname(os.path.abspath(self.RECORDING_PATH)), exist_ok=True)
-        self.recordedFrames = []
-        self.recordingStartTime = time.time()
-        self.isRecording = True
-        self.lastRecordingPath = self.RECORDING_PATH
-        self.btnRecord.setText("⏹")
-        self.btnRecord.setStyleSheet(self.btnRecord.styleSheet().replace("#2e2e50", "#6e2020"))
-        print(f"{BLUE}Recording started.{ENDC}")
-
-    def _stopRecording(self):
-        self.isRecording = False
-        self.btnRecord.setText("⏺")
-        self.btnRecord.setStyleSheet(self.btnRecord.styleSheet().replace("#6e2020", "#2e2e50"))
-
-        if self.recordedFrames:
-            elapsed = time.time() - self.recordingStartTime  # type: ignore
-            actual_fps = len(self.recordedFrames) / elapsed if elapsed > 0 else 30.0
-            h, w = self.recordedFrames[0].shape[:2]
-            fourcc = cv2.VideoWriter_fourcc(*"MJPG")  # type: ignore
-            writer = cv2.VideoWriter(self.RECORDING_PATH, fourcc, actual_fps, (w, h))
-            for frame in self.recordedFrames:
-                writer.write(frame)
-            writer.release()
-            self.recordedFrames = []
-            print(f"{BLUE}Recording stopped, saved to '{self.RECORDING_PATH}' at {actual_fps:.1f} FPS.{ENDC}")
-        else:
-            print(f"{BLUE}Recording stopped, no frames captured.{ENDC}")
-
-    def onPlayback(self):
-        """Toggle playback of the last recorded video in the webcam slot."""
-        if self.isPlaybackMode:
-            # Stop playback, go back to live webcam
-            self.isPlaybackMode = False
-            if self.playbackCapture is not None:
-                self.playbackCapture.release()
-                self.playbackCapture = None
-            self.btnPlayback.setText("📽")
-            print(f"{BLUE}Playback stopped, resuming live webcam.{ENDC}")
-        else:
-            if self.lastRecordingPath is None or not os.path.isfile(self.lastRecordingPath):
-                print(f"{WARNING}Warning:{ENDC} No recorded video to play back.")
-                return
-            self.playbackCapture = cv2.VideoCapture(self.lastRecordingPath)
-            fps = self.playbackCapture.get(cv2.CAP_PROP_FPS)
-            self.playbackFps = fps if fps > 0 else 30.0
-            self.nextPlaybackFrameTime = time.time()
-            self.currentPlaybackFrame = None
-            self.isPlaybackMode = True
-            self.btnPlayback.setText("📷")
-            print(f"{BLUE}Playing back recorded video at {self.playbackFps:.1f} FPS.{ENDC}")
-
-    def onToggleAnnotations(self, checked: bool):
-        """Show or hide hand annotations on both video streams."""
-        self.showAnnotations = checked
-        self.btnAnnotations.setText("👁" if checked else "🚫")
-        print(f"{BLUE}Toggled annotations.{ENDC}")
-
-    def onSpeedDown(self):
-        """Decrease reference video playback speed."""
-        if self.speedIndex > 0:
-            self.speedIndex -= 1
-            self._applySpeed()
-
-    def onSpeedUp(self):
-        """Increase reference video playback speed."""
-        if self.speedIndex < len(SPEED_STEPS) - 1:
-            self.speedIndex += 1
-            self._applySpeed()
-
-    def _applySpeed(self):
-        speed = SPEED_STEPS[self.speedIndex]
-        self.speedLabel.setText(f"{speed:.2g}×")
-        interval = int(1000 / (BASE_FPS * speed))
-        self.refTimer.setInterval(interval)
-        print(f"{BLUE}Reference video speed set to {speed:.2g}× ({interval} ms/frame).{ENDC}")
-
-    # ------------------------------------------------------------------
-    # Video processing and playback
-    # ------------------------------------------------------------------
-
-    def displayVideoStream(self):
-        """Capture a frame from the webcam (or playback file), annotate, and display in the UI.
-
-        Called periodically by the camera timer (~33 FPS). When in playback mode the left
-        panel shows frames from the last recorded video instead of the live webcam.
-        Collects user landmarks for scoring when tracking is active.
-        """
-        if self.isPlaybackMode and self.playbackCapture is not None:
-            now = time.time()
-            if now >= self.nextPlaybackFrameTime:
-                ret, frame = self.playbackCapture.read()
-                if not ret:
-                    # Loop playback from start
-                    self.playbackCapture.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    ret, frame = self.playbackCapture.read()
-                if ret:
-                    self.currentPlaybackFrame = frame
-                self.nextPlaybackFrameTime += 1.0 / self.playbackFps
-            frame = self.currentPlaybackFrame
-            if frame is not None:
-                image = self.webcamAnnotation.processSpecificFrame(
-                    frame,
-                    returnQt=True,
-                    drawAnnotations=self.showAnnotations,
-                )
-                if image is not None:
-                    self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
-            return
-
-        # --- Live webcam mode ---
-        ret, frame = self.capture.read()
-
-        if ret:
-            image = self.webcamAnnotation.processSpecificFrame(
-                frame,
-                returnQt=True,
-                drawAnnotations=self.showAnnotations,
-            )
-
-            if image is not None:
-                self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
-
-            # Buffer frame during recording
-            if self.isRecording:
-                self.recordedFrames.append(frame.copy())
-
-            # Collect user landmarks at the configured sampling rate when tracking is active
-            if self.isTracking:
-                timestamp = time.time() - self.startTime
-                if timestamp >= self.nextSampleTime:
-                    self.userLandmarksTimestamped.append(
-                        (
-                            timestamp,
-                            copy.deepcopy(self.webcamAnnotation.handLandmarksList),
-                            list(self.webcamAnnotation.currentWristPositions),
-                        )
-                    )
-                    self.nextSampleTime += self.SAMPLING_RATE
-
-    def annotateReferenceVideo(self, referenceVideoPath):
-        """Process and cache an annotated version of the reference video.
-
-        Checks if an annotated version already exists; if so, returns it. Otherwise,
-        creates a new annotated video by processing the original frame-by-frame.
-
-        Args:
-            referenceVideoPath: Path to the input reference video file.
-
-        Returns:
-            cv2.VideoCapture object pointing to the annotated reference video (existing or newly created).
-
-        Note:
-            Annotated videos are saved with '_annotated' suffix in the ANNOTATED_FOLDER.
-        """
-
-        # Generate output path by inserting '_annotated' before file extension
-        filename = os.path.basename(referenceVideoPath)
-        basename, ext = os.path.splitext(filename)
-        outputPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
-        landmarksPath = os.path.splitext(outputPath)[0] + "_handLandmarks.json"
-
-        if os.path.isfile(outputPath):
-            print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
-
-            # Ensure reference landmarks are loaded when using cached annotated video.
-            loaded = self.referenceAnnotation.loadLandmarksFromFile(landmarksPath)  # type: ignore
-            if loaded is None:
-                print(
-                    f"{WARNING}Warning{ENDC}: Cached landmarks missing for '{outputPath}'. "
-                    "Rebuilding annotated video and landmarks."
-                )
-                return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
-
-            return cv2.VideoCapture(outputPath)
-
-        return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
 
     def _buildVideoQueue(self):
         """Scan FOLDER, group files by gesture name, return a shuffled list of variant-groups.
@@ -694,6 +469,119 @@ class Window(QtWidgets.QWidget):
         sortedGroups = [sorted(paths, key=_variantKey) for paths in groups.values()]
         random.shuffle(sortedGroups)
         return sortedGroups
+
+    def annotateReferenceVideo(self, referenceVideoPath):
+        """Process and cache an annotated version of the reference video.
+
+        Checks if an annotated version already exists; if so, returns it. Otherwise,
+        creates a new annotated video by processing the original frame-by-frame.
+
+        Args:
+            referenceVideoPath: Path to the input reference video file.
+
+        Returns:
+            cv2.VideoCapture object pointing to the annotated reference video (existing or newly created).
+
+        Note:
+            Annotated videos are saved with '_annotated' suffix in the ANNOTATED_FOLDER.
+        """
+
+        # Generate output path by inserting '_annotated' before file extension
+        filename = os.path.basename(referenceVideoPath)
+        basename, ext = os.path.splitext(filename)
+        outputPath = os.path.join(self.ANNOTATED_FOLDER, f"{basename}_annotated{ext}")
+        landmarksPath = os.path.splitext(outputPath)[0] + "_handLandmarks.json"
+
+        if os.path.isfile(outputPath):
+            print(f"Reference video {HEADER}already exists{ENDC}, loading from cache.")
+
+            # Ensure reference landmarks are loaded when using cached annotated video.
+            loaded = self.referenceAnnotation.loadLandmarksFromFile(landmarksPath)  # type: ignore
+            if loaded is None:
+                print(
+                    f"{WARNING}Warning{ENDC}: Cached landmarks missing for '{outputPath}'. "
+                    "Rebuilding annotated video and landmarks."
+                )
+                return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
+
+            return cv2.VideoCapture(outputPath)
+
+        return self.referenceAnnotation.createAnnotatedVideo(referenceVideoPath, outputPath)  # type: ignore
+
+    def _updateGestureName(self, path):
+        """Update the gesture name label and variant arrow visibility for the given path."""
+        if not hasattr(self, "gestureName"):
+            return
+        stem = os.path.splitext(os.path.basename(path))[0]
+        for suffix in self.VARIANT_SUFFIXES:
+            if stem.endswith(suffix):
+                stem = stem[: -len(suffix)]
+                break
+        numVariants = len(self.videoQueue[self.videoQueueIndex]) if self.videoQueue else 1
+        if numVariants > 1:
+            currentStem = os.path.splitext(os.path.basename(path))[0]
+            variantLabel = self.VARIANT_LABEL_BASIC
+            for suffix in self.VARIANT_SUFFIXES:
+                if currentStem.endswith(suffix):
+                    variantLabel = self.VARIANT_LABELS[suffix]
+                    break
+            label = f"{stem} ({variantLabel})" if variantLabel else stem
+            self.gestureName.setText(label)
+        else:
+            self.gestureName.setText(stem)
+        self.btnVariantPrev.setVisible(numVariants > 1)
+        self.btnVariantNext.setVisible(numVariants > 1)
+
+    def _finishLoading(self, path, annotatedPath):
+        """Open captures, reset state, and wire up scoring after a video is ready."""
+        self.referenceVideo = cv2.VideoCapture(path)
+        self.annotatedReferenceVideo = cv2.VideoCapture(annotatedPath) if os.path.isfile(annotatedPath) else None
+        self.referenceVideoPauseUntil = 0.0
+        self.isTracking = False
+        self.userLandmarksTimestamped = []
+
+        # Read pre-computed marker positions (0-1000 scale) from annotation object
+        markerStart = getattr(self.referenceAnnotation, "markerStart", 0)
+        markerEnd = getattr(self.referenceAnnotation, "markerEnd", 1000)
+
+        # Seek both captures to the beginning
+        self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        if self.annotatedReferenceVideo is not None:
+            self.annotatedReferenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+        if hasattr(self, "refProgressBar"):
+            self.refProgressBar.setValue(0)
+            self.refProgressBar.setTrimMarkers(markerStart, markerEnd)
+
+        # Reset reference frame deadline so playback starts immediately
+        self.nextRefFrameTime = time.time()
+
+        if hasattr(self, "webcamAnnotation"):
+            self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation, strategy=SCORING_STRATEGY)
+
+        print(f"{GREEN}✓{ENDC} Loaded reference video [{self.videoQueueIndex}]: '{path}'.")
+
+    def _onAnnotationFinished(self):
+        """Called on the main thread when the background annotation worker completes."""
+        self._annotationWorker = None
+        self.annotateReferenceVideo(self._pendingPath)  # loads landmarks from the now-existing file
+        self._finishLoading(self._pendingPath, self._pendingAnnotatedPath)
+        if hasattr(self, "refStack"):
+            self.refStack.setCurrentIndex(0)
+        if hasattr(self, "refTimer"):
+            self.refTimer.start(int(1000 / BASE_FPS))
+        for b in (
+            self.btnPrev,
+            self.btnPlayPause,
+            self.btnNext,
+            self.btnVariantPrev,
+            self.btnVariantNext,
+            self.btnSpeedDown,
+            self.btnSpeedUp,
+            self.btnAnnotations,
+        ):
+            b.setEnabled(True)
+        print(f"{GREEN}✓{ENDC} Annotation complete, starting playback.")
 
     def _loadVideoAtIndex(self, groupIndex, variantIndex=0):
         """Load the reference video at *groupIndex* in the queue, *variantIndex* within its group."""
@@ -776,81 +664,6 @@ class Window(QtWidgets.QWidget):
             self._annotationWorker.start()
             print(f"{BLUE}Annotating '{path}' in background…{ENDC}")
 
-    def _updateGestureName(self, path):
-        """Update the gesture name label and variant arrow visibility for the given path."""
-        if not hasattr(self, "gestureName"):
-            return
-        stem = os.path.splitext(os.path.basename(path))[0]
-        for suffix in self.VARIANT_SUFFIXES:
-            if stem.endswith(suffix):
-                stem = stem[: -len(suffix)]
-                break
-        numVariants = len(self.videoQueue[self.videoQueueIndex]) if self.videoQueue else 1
-        if numVariants > 1:
-            currentStem = os.path.splitext(os.path.basename(path))[0]
-            variantLabel = self.VARIANT_LABEL_BASIC
-            for suffix in self.VARIANT_SUFFIXES:
-                if currentStem.endswith(suffix):
-                    variantLabel = self.VARIANT_LABELS[suffix]
-                    break
-            label = f"{stem} ({variantLabel})" if variantLabel else stem
-            self.gestureName.setText(label)
-        else:
-            self.gestureName.setText(stem)
-        self.btnVariantPrev.setVisible(numVariants > 1)
-        self.btnVariantNext.setVisible(numVariants > 1)
-
-    def _onAnnotationFinished(self):
-        """Called on the main thread when the background annotation worker completes."""
-        self._annotationWorker = None
-        self.annotateReferenceVideo(self._pendingPath)  # loads landmarks from the now-existing file
-        self._finishLoading(self._pendingPath, self._pendingAnnotatedPath)
-        if hasattr(self, "refStack"):
-            self.refStack.setCurrentIndex(0)
-        if hasattr(self, "refTimer"):
-            self.refTimer.start(int(1000 / BASE_FPS))
-        for b in (
-            self.btnPrev,
-            self.btnPlayPause,
-            self.btnNext,
-            self.btnVariantPrev,
-            self.btnVariantNext,
-            self.btnSpeedDown,
-            self.btnSpeedUp,
-            self.btnAnnotations,
-        ):
-            b.setEnabled(True)
-        print(f"{GREEN}✓{ENDC} Annotation complete, starting playback.")
-
-    def _finishLoading(self, path, annotatedPath):
-        """Open captures, reset state, and wire up scoring after a video is ready."""
-        self.referenceVideo = cv2.VideoCapture(path)
-        self.annotatedReferenceVideo = cv2.VideoCapture(annotatedPath) if os.path.isfile(annotatedPath) else None
-        self.referenceVideoPauseUntil = 0.0
-        self.isTracking = False
-        self.userLandmarksTimestamped = []
-
-        # Read pre-computed marker positions (0-1000 scale) from annotation object
-        markerStart = getattr(self.referenceAnnotation, "markerStart", 0)
-        markerEnd = getattr(self.referenceAnnotation, "markerEnd", 1000)
-
-        # Seek both captures to the beginning
-        self.referenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        if self.annotatedReferenceVideo is not None:
-            self.annotatedReferenceVideo.set(cv2.CAP_PROP_POS_FRAMES, 0)
-
-        if hasattr(self, "refProgressBar"):
-            self.refProgressBar.setValue(0)
-            self.refProgressBar.setTrimMarkers(markerStart, markerEnd)
-
-        # Reset reference frame deadline so playback starts immediately
-        self.nextRefFrameTime = time.time()
-
-        if hasattr(self, "webcamAnnotation"):
-            self.scoring = Scoring(self.webcamAnnotation, self.referenceAnnotation, strategy=SCORING_STRATEGY)
-
-        print(f"{GREEN}✓{ENDC} Loaded reference video [{self.videoQueueIndex}]: '{path}'.")
-
     def loadReferenceVideo(self):
         """Build queue and load the first reference video.
 
@@ -877,6 +690,10 @@ class Window(QtWidgets.QWidget):
 
         print(f"{GREEN}✓{ENDC} Player setup complete.")
 
+    # ------------------------------------------------------------------
+    # Video playback
+    # ------------------------------------------------------------------
+
     def saveUserLandmarks(self):
         """Save the collected webcam landmark sequence to a JSON file."""
         if not self.userLandmarksTimestamped:
@@ -898,6 +715,25 @@ class Window(QtWidgets.QWidget):
             json.dump(userData, f, indent=2)
 
         print(f"{GREEN}✓{ENDC} Saved user landmarks to '{outFile}'.")
+
+    def updateScore(self):
+        """Update the score display label with the current score, color-coded by performance level."""
+
+        currentScore = self.scoring.calculateScore(self.userLandmarksTimestamped)
+        pct = currentScore * 100
+        self.score.setText(f"Score: {pct:.1f}%")
+
+        if pct >= 70:
+            color = "#4caf50"  # green
+        elif pct >= 40:
+            color = "#ff9800"  # orange
+        else:
+            color = "#f44336"  # red
+
+        self.score.setStyleSheet(
+            f"font-size: 22px; font-weight: bold; color: {color};"
+            "background-color: #2a2a3e; border-radius: 8px; padding: 8px 16px;"
+        )
 
     def displayReferenceVideo(self):
         """Display the next frame from the reference video, looping from the start when finished.
@@ -981,21 +817,197 @@ class Window(QtWidgets.QWidget):
         if totalFrames > 1:
             self.refProgressBar.setValue(int((currentFrame - 1) / (totalFrames - 1) * 1000))
 
-    def updateScore(self):
-        """Update the score display label with the current score, color-coded by performance level."""
+    def displayVideoStream(self):
+        """Capture a frame from the webcam (or playback file), annotate, and display in the UI.
 
-        currentScore = self.scoring.calculateScore(self.userLandmarksTimestamped)
-        pct = currentScore * 100
-        self.score.setText(f"Score: {pct:.1f}%")
+        Called periodically by the camera timer (~33 FPS). When in playback mode the left
+        panel shows frames from the last recorded video instead of the live webcam.
+        Collects user landmarks for scoring when tracking is active.
+        """
+        if self.isPlaybackMode and self.playbackCapture is not None:
+            now = time.time()
+            if now >= self.nextPlaybackFrameTime:
+                ret, frame = self.playbackCapture.read()
+                if not ret:
+                    # Loop playback from start
+                    self.playbackCapture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = self.playbackCapture.read()
+                if ret:
+                    self.currentPlaybackFrame = frame
+                self.nextPlaybackFrameTime += 1.0 / self.playbackFps
+            frame = self.currentPlaybackFrame
+            if frame is not None:
+                image = self.webcamAnnotation.processSpecificFrame(
+                    frame,
+                    returnQt=True,
+                    drawAnnotations=self.showAnnotations,
+                )
+                if image is not None:
+                    self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
+            return
 
-        if pct >= 70:
-            color = "#4caf50"  # green
-        elif pct >= 40:
-            color = "#ff9800"  # orange
+        # --- Live webcam mode ---
+        ret, frame = self.capture.read()
+
+        if ret:
+            image = self.webcamAnnotation.processSpecificFrame(
+                frame,
+                returnQt=True,
+                drawAnnotations=self.showAnnotations,
+            )
+
+            if image is not None:
+                self.webcam.setPixmap(QtGui.QPixmap.fromImage(image))
+
+            # Buffer frame during recording
+            if self.isRecording:
+                self.recordedFrames.append(frame.copy())
+
+            # Collect user landmarks at the configured sampling rate when tracking is active
+            if self.isTracking:
+                timestamp = time.time() - self.startTime
+                if timestamp >= self.nextSampleTime:
+                    self.userLandmarksTimestamped.append(
+                        (
+                            timestamp,
+                            copy.deepcopy(self.webcamAnnotation.handLandmarksList),
+                            list(self.webcamAnnotation.currentWristPositions),
+                        )
+                    )
+                    self.nextSampleTime += self.SAMPLING_RATE
+
+    # ------------------------------------------------------------------
+    # Control panel callbacks
+    # ------------------------------------------------------------------
+
+    def onPlayPause(self):
+        """Toggle pause/play of the reference video."""
+        self.refPaused = not self.refPaused
+        self.btnPlayPause.setText("▶" if self.refPaused else "⏸")
+        if not self.refPaused:
+            # Reset the frame deadline so the catch-up logic doesn't burst-skip
+            # all the frames that accumulated while the video was paused.
+            self.nextRefFrameTime = time.time()
+        print(f"{BLUE}Toggled play/pause.{ENDC}")
+
+    def _applySpeed(self):
+        speed = SPEED_STEPS[self.speedIndex]
+        self.speedLabel.setText(f"{speed:.2g}×")
+        interval = int(1000 / (BASE_FPS * speed))
+        self.refTimer.setInterval(interval)
+        print(f"{BLUE}Reference video speed set to {speed:.2g}× ({interval} ms/frame).{ENDC}")
+
+    def onSpeedDown(self):
+        """Decrease reference video playback speed."""
+        if self.speedIndex > 0:
+            self.speedIndex -= 1
+            self._applySpeed()
+
+    def onSpeedUp(self):
+        """Increase reference video playback speed."""
+        if self.speedIndex < len(SPEED_STEPS) - 1:
+            self.speedIndex += 1
+            self._applySpeed()
+
+    def _startRecording(self):
+        os.makedirs(os.path.dirname(os.path.abspath(self.RECORDING_PATH)), exist_ok=True)
+        self.recordedFrames = []
+        self.recordingStartTime = time.time()
+        self.isRecording = True
+        self.lastRecordingPath = self.RECORDING_PATH
+        self.btnRecord.setText("⏹")
+        self.btnRecord.setStyleSheet(self.btnRecord.styleSheet().replace("#2e2e50", "#6e2020"))
+        self.btnPlayback.setEnabled(False)
+        print(f"{BLUE}Recording started.{ENDC}")
+
+    def _stopRecording(self):
+        self.isRecording = False
+        self.btnRecord.setText("⏺")
+        self.btnRecord.setStyleSheet(self.btnRecord.styleSheet().replace("#6e2020", "#2e2e50"))
+        self.btnPlayback.setEnabled(True)
+
+        if self.recordedFrames:
+            elapsed = time.time() - self.recordingStartTime  # type: ignore
+            actual_fps = len(self.recordedFrames) / elapsed if elapsed > 0 else 30.0
+            h, w = self.recordedFrames[0].shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
+            writer = cv2.VideoWriter(self.RECORDING_PATH, fourcc, actual_fps, (w, h))
+            for frame in self.recordedFrames:
+                writer.write(frame)
+            writer.release()
+            self.recordedFrames = []
+            print(f"{BLUE}Recording stopped, saved to '{self.RECORDING_PATH}' at {actual_fps:.1f} FPS.{ENDC}")
         else:
-            color = "#f44336"  # red
+            print(f"{BLUE}Recording stopped, no frames captured.{ENDC}")
 
-        self.score.setStyleSheet(
-            f"font-size: 22px; font-weight: bold; color: {color};"
-            "background-color: #2a2a3e; border-radius: 8px; padding: 8px 16px;"
-        )
+    def onRecord(self):
+        """Start or stop recording the webcam stream."""
+        if self.isRecording:
+            self._stopRecording()
+        else:
+            self._startRecording()
+
+    def onPlayback(self):
+        """Toggle playback of the last recorded video in the webcam slot."""
+        if self.isPlaybackMode:
+            # Stop playback, go back to live webcam
+            self.isPlaybackMode = False
+            if self.playbackCapture is not None:
+                self.playbackCapture.release()
+                self.playbackCapture = None
+            self.btnPlayback.setText("📽")
+            self.btnRecord.setEnabled(True)
+            print(f"{BLUE}Playback stopped, resuming live webcam.{ENDC}")
+        else:
+            if self.lastRecordingPath is None or not os.path.isfile(self.lastRecordingPath):
+                print(f"{WARNING}Warning:{ENDC} No recorded video to play back.")
+                return
+            self.playbackCapture = cv2.VideoCapture(self.lastRecordingPath)
+            fps = self.playbackCapture.get(cv2.CAP_PROP_FPS)
+            self.playbackFps = fps if fps > 0 else 30.0
+            self.nextPlaybackFrameTime = time.time()
+            self.currentPlaybackFrame = None
+            self.isPlaybackMode = True
+            self.btnPlayback.setText("📷")
+            self.btnRecord.setEnabled(False)
+            print(f"{BLUE}Playing back recorded video at {self.playbackFps:.1f} FPS.{ENDC}")
+
+    def onToggleAnnotations(self, checked: bool):
+        """Show or hide hand annotations on both video streams."""
+        self.showAnnotations = checked
+        self.btnAnnotations.setText("👁" if checked else "🚫")
+        print(f"{BLUE}Toggled annotations.{ENDC}")
+
+    def onPrevVideo(self):
+        """Navigate to the previous gesture in the queue (resets to basic variant)."""
+        if not self.videoQueue:
+            return
+        self.videoQueueIndex = (self.videoQueueIndex - 1) % len(self.videoQueue)
+        self._loadVideoAtIndex(self.videoQueueIndex)
+
+    def onNextVideo(self):
+        """Advance to the next gesture in the queue (resets to basic variant)."""
+        if not self.videoQueue:
+            return
+        self.videoQueueIndex = (self.videoQueueIndex + 1) % len(self.videoQueue)
+        self._loadVideoAtIndex(self.videoQueueIndex)
+
+    def onPrevVariant(self):
+        """Show the previous variant of the current gesture."""
+        if not self.videoQueue:
+            return
+        variants = self.videoQueue[self.videoQueueIndex]
+        if len(variants) < 2:
+            return
+        self.variantIndex = (self.variantIndex - 1) % len(variants)
+        self._loadVideoAtIndex(self.videoQueueIndex, self.variantIndex)
+
+    def onNextVariant(self):
+        """Show the next variant of the current gesture."""
+        if not self.videoQueue:
+            return
+        variants = self.videoQueue[self.videoQueueIndex]
+        if len(variants) < 2:
+            return
+        self.variantIndex = (self.variantIndex + 1) % len(variants)
+        self._loadVideoAtIndex(self.videoQueueIndex, self.variantIndex)

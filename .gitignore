@@ -208,3 +208,5 @@ __marimo__/
 
 # my files
 *.mp4
+videos/.annotated/webcam_userLandmarks.json
+videos/.recorded/
