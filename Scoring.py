@@ -4,6 +4,8 @@ import math
 
 # Scoring strategy presets — change the strategy name to switch behaviour.
 # Each strategy defines the tunable calibration parameters.
+# This is not a part of the aplication itself, it exists just to experiment with
+#   different scoring parameters without changing the code.
 SCORING_STRATEGIES = {
     "original": {
         "dtwMaxDistance": 2.0,

@@ -160,41 +160,17 @@ class HandAnnotation:
         translated = [self._getTranslatedLandmarks(hand) for hand in detectionResult.hand_landmarks]
         normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]
         self.handLandmarksList = self._landmarksToDict(normalized)
-        handednessList = detectionResult.handedness
         annotatedImage = np.copy(rgbImage)
 
         handProtos = self.extractHandLandmarkProtos(detectionResult)
 
-        # Iterate through each detected hand
-        for idx, handLandmarksProto in enumerate(handProtos):
-            handedness = handednessList[idx]
-
+        for handLandmarksProto in handProtos:
             mp.solutions.drawing_utils.draw_landmarks(
                 annotatedImage,
                 handLandmarksProto,
                 mp.solutions.hands.HAND_CONNECTIONS,
                 mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
                 mp.solutions.drawing_styles.get_default_hand_connections_style(),
-            )
-
-            # Calculate text position for handedness label (above the hand)
-            height, width, _ = annotatedImage.shape
-            handLandmarks = self.handLandmarksList[idx]
-            xCoordinates = [landmark["x"] for landmark in handLandmarks]
-            yCoordinates = [landmark["y"] for landmark in handLandmarks]
-            textX = int(min(xCoordinates) * width)
-            textY = int(min(yCoordinates) * height) - self.MARGIN
-
-            # Draw "Left" or "Right" text label above the hand
-            cv2.putText(
-                annotatedImage,
-                f"{handedness[0].category_name}",
-                (textX, textY),
-                cv2.FONT_HERSHEY_DUPLEX,
-                self.FONT_SIZE,
-                self.HANDEDNESS_TEXT_COLOR,
-                self.FONT_THICKNESS,
-                cv2.LINE_AA,
             )
 
         return annotatedImage
@@ -346,46 +322,22 @@ class HandAnnotation:
     # Video annotation
     # ------------------------------------------------------------------
 
-    def _findActiveFrameRange(self, videoPath, fps):
-        """Fast first pass: find first and last frame with significant hand movement.
-
-        Computes the mean absolute displacement of all detected landmark positions
-        between consecutive frames. Frames where this displacement exceeds
-        MOVEMENT_THRESHOLD are considered 'active'.
+    def _computeTrimMarkers(self, landmarksPerFrame, totalFrames, fps):
+        """Compute trim frame indices from pre-collected per-frame 2-D landmark data.
 
         Args:
-            videoPath: Path to the video file.
+            landmarksPerFrame: List of (frameIdx, coords_or_None) tuples where coords is
+                               a (N, 2) numpy array of image-space landmark positions.
+            totalFrames: Total number of frames in the video.
             fps: Frames per second (used to compute padding in frames).
 
         Returns:
             (trimStart, trimEnd) frame indices with padding applied, or (0, totalFrames-1)
             if no movement is detected.
         """
-        video = cv2.VideoCapture(videoPath)
-        totalFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-
-        # Collect raw (image-space) landmark positions per frame
-        landmarksPerFrame = []
-        frameIdx = 0
-        ret, frame = video.read()
-        while ret:
-            rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
-            result = self.detector.detect(image)
-            if result.hand_landmarks:
-                # Flatten all detected hands into one position vector
-                coords = np.array([[lm.x, lm.y] for hand in result.hand_landmarks for lm in hand])
-                landmarksPerFrame.append((frameIdx, coords))
-            else:
-                landmarksPerFrame.append((frameIdx, None))  # type: ignore
-            frameIdx += 1
-            ret, frame = video.read()
-        video.release()
-
         if not landmarksPerFrame:
             return 0, max(totalFrames - 1, 0)
 
-        # Compute per-frame displacement relative to the previous frame that had landmarks
         firstActive = None
         lastActive = None
         prevCoords = None
@@ -403,12 +355,15 @@ class HandAnnotation:
             prevCoords = coords
 
         if firstActive is None:
-            print(f"{WARNING}No hand movement detected in '{videoPath}', skipping trim.{ENDC}")
+            print(f"{WARNING}No hand movement detected, skipping trim.{ENDC}")
             return 0, max(totalFrames - 1, 0)
 
         pad = int(fps * self.TRIM_PADDING_SECONDS)
-        trimStart = max(0, firstActive - pad)
-        trimEnd = min(totalFrames - 1, lastActive + pad)  # type: ignore # but keep in mind
+        trimStart = max(0, firstActive - pad if firstActive is not None else 0)
+        if lastActive is not None:
+            trimEnd = min(totalFrames - 1, lastActive + pad)
+        else:
+            trimEnd = totalFrames - 1
         trimmedSeconds = (trimEnd - trimStart + 1) / fps
         print(
             f"{BLUE}Trim range: frames {trimStart}–{trimEnd} "
@@ -432,27 +387,18 @@ class HandAnnotation:
         """
         print(f"Creating annotated video from {HEADER}'{videoPath}'{ENDC} at '{HEADER}{outputPath}{ENDC}'.")
 
-        # --- Pass 1: fast scan to determine trim boundaries ---
-        scanCap = cv2.VideoCapture(videoPath)
-        if not scanCap.isOpened():
+        video = cv2.VideoCapture(videoPath)
+        if not video.isOpened():
             print(f"{FAIL}Error{ENDC}: Could not open video at '{videoPath}'.")
             return None
-        fps = scanCap.get(cv2.CAP_PROP_FPS) or 30.0
-        width = int(scanCap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(scanCap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        totalFrames = int(scanCap.get(cv2.CAP_PROP_FRAME_COUNT))
-        scanCap.release()
 
-        trimStart, trimEnd = self._findActiveFrameRange(videoPath, fps)
-        denom = max(1, totalFrames - 1)
-        self.markerStart = int(trimStart / denom * 1000)
-        self.markerEnd = int(trimEnd / denom * 1000)
+        fps = video.get(cv2.CAP_PROP_FPS) or 30.0
+        width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        totalFrames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        # --- Pass 2: annotate ALL frames (no skipping) ---
-        video = cv2.VideoCapture(videoPath)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
         out = cv2.VideoWriter(outputPath, fourcc, fps, (width, height))
-
         if not out.isOpened():
             print(f"{FAIL}Error{ENDC}: Could not initialize VideoWriter.")
             video.release()
@@ -463,14 +409,18 @@ class HandAnnotation:
         self.handLandmarksTimestamped = []  # Reset for new video
         nextSampleTime = 0.0
         frameIdx = 0
+        landmarksPerFrame = []  # collected for trim marker computation after the loop
 
         ret, frame = video.read()
         while ret:
-            annotated = self.processSpecificFrame(frame)
+            rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
+            detectionResult = self.detector.detect(image)
 
-            if annotated is not None:
-                out.write(annotated)
-                framesProcessed += 1
+            # Annotate frame — also sets self.handLandmarksList and self.currentWristPositions
+            annotatedImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
+            out.write(cv2.cvtColor(annotatedImage, cv2.COLOR_RGB2BGR))
+            framesProcessed += 1
 
             timestampSeconds = frameIdx / fps
             if timestampSeconds >= nextSampleTime:
@@ -479,11 +429,24 @@ class HandAnnotation:
                 )
                 nextSampleTime += self.SAMPLING_RATE
 
+            # Collect 2-D positions for trim computation (reuses already-detected landmarks)
+            if detectionResult.hand_landmarks:
+                coords2d = np.array([[lm.x, lm.y] for hand in detectionResult.hand_landmarks for lm in hand])
+                landmarksPerFrame.append((frameIdx, coords2d))
+            else:
+                landmarksPerFrame.append((frameIdx, None))  # type: ignore
+
             frameIdx += 1
             ret, frame = video.read()
 
         video.release()
         out.release()
+
+        # Compute trim markers from detection data collected during the single pass above
+        trimStart, trimEnd = self._computeTrimMarkers(landmarksPerFrame, totalFrames, fps)
+        denom = max(1, totalFrames - 1)
+        self.markerStart = int(trimStart / denom * 1000)
+        self.markerEnd = int(trimEnd / denom * 1000)
 
         self.saveLandmarksToFile(outputPath)  # Save landmarks to a text file alongside the video
 

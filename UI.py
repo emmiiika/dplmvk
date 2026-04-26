@@ -72,9 +72,9 @@ class TrimProgressBar(QtWidgets.QWidget):
         startX = self._trimStart / 1000 * w
         endX = self._trimEnd / 1000 * w
         if self._markersVisible and abs(x - startX) <= self.MARKER_HIT_PX:
-            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(), "Start of movement", self)
+            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(), "Začiatok pohybu", self)
         elif self._markersVisible and abs(x - endX) <= self.MARKER_HIT_PX:
-            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(), "End of movement", self)
+            QtWidgets.QToolTip.showText(event.globalPosition().toPoint(), "Koniec pohybu", self)
         else:
             QtWidgets.QToolTip.hideText()
 
@@ -233,22 +233,22 @@ class Window(QtWidgets.QWidget):
             b.setFixedHeight(42)
             return b
 
-        self.btnPrev = btn("⏮", "Previous reference video")
-        self.btnPlayPause = btn("⏸", "Pause / Play reference video")
-        self.btnNext = btn("⏭", "Next reference video")
-        self.btnRecord = btn("⏺", "Start / Stop recording")
-        self.btnPlayback = btn("📽", "Play last recorded video")
-        self.btnAnnotations = btn("👁", "Toggle annotation visibility")
+        self.btnPrev = btn("⏮", "Predchádzajúce referenčné video")
+        self.btnPlayPause = btn("⏸", "Pozastaviť / Prehrať referenčné video")
+        self.btnNext = btn("⏭", "Nasledujúce referenčné video")
+        self.btnRecord = btn("⏺", "Spustiť / Zastaviť nahrávanie")
+        self.btnPlayback = btn("📽", "Prehrať posledné nahraté video")
+        self.btnAnnotations = btn("👁", "Zobraziť alebo skryť anotácie")
         self.btnAnnotations.setCheckable(True)
         self.btnAnnotations.setChecked(True)
 
         # Speed control: [−] [1.0×] [+]
-        self.btnSpeedDown = btn("−", "Decrease playback speed")
+        self.btnSpeedDown = btn("−", "Znížiť rýchlosť prehrávania")
         self.btnSpeedDown.setFixedWidth(36)
         self.speedLabel = QtWidgets.QLabel(f"{SPEED_STEPS[self.speedIndex]:.2g}×")
         self.speedLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.speedLabel.setStyleSheet("color: #e0e0e0; font-size: 16px; min-width: 44px;")
-        self.btnSpeedUp = btn("+", "Increase playback speed")
+        self.btnSpeedUp = btn("+", "Zvýšiť rýchlosť prehrávania")
         self.btnSpeedUp.setFixedWidth(36)
 
         layout = QtWidgets.QHBoxLayout(panel)
@@ -346,11 +346,11 @@ class Window(QtWidgets.QWidget):
             " border: 1px solid #333344; }"
         )
         self.btnVariantPrev = QtWidgets.QPushButton("<")
-        self.btnVariantPrev.setToolTip("Previous variant (same gesture)")
+        self.btnVariantPrev.setToolTip("Predchádzajúci variant (rovnaké gesto)")
         self.btnVariantPrev.setStyleSheet(_varBtnStyle)
         self.btnVariantPrev.setFixedWidth(32)
         self.btnVariantNext = QtWidgets.QPushButton(">")
-        self.btnVariantNext.setToolTip("Next variant (same gesture)")
+        self.btnVariantNext.setToolTip("Nasledujúci variant (rovnaké gesto)")
         self.btnVariantNext.setStyleSheet(_varBtnStyle)
         self.btnVariantNext.setFixedWidth(32)
         self.btnVariantPrev.clicked.connect(self.onPrevVariant)
@@ -397,7 +397,7 @@ class Window(QtWidgets.QWidget):
         self.setLayout(root)
 
         self.setStyleSheet("background-color: #12121f; color: #e0e0e0;")
-        self.setWindowTitle("Gesture Trainer")
+        self.setWindowTitle("Trénovanie posunkov")
 
         print(f"{GREEN}✓{ENDC} UI setup complete.")
 

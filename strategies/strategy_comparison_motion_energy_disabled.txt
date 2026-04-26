@@ -1,0 +1,344 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1777067516.044565   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067516.061990   77679 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+W0000 00:00:1777067516.121680   77682 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067516.162131   77683 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067516.218346   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067516.222527   77715 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067516.276251   77718 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067516.308187   77729 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067519.525565   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067519.529226   77754 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067519.582778   77757 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067519.616511   77756 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067519.673065   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067519.677092   77790 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067519.728761   77793 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067519.761364   77804 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067525.171553   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067525.173911   77889 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067525.200821   77893 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067525.219209   77905 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067525.242171   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067525.245409   77925 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067525.273753   77928 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067525.294133   77929 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067526.540403   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067526.543002   77965 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067526.571845   77968 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067526.593861   77980 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067526.631302   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067526.633996   78001 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067526.668552   78003 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067526.688080   78009 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067528.456764   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067528.458893   78058 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067528.489895   78060 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067528.520490   78074 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067528.567821   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067528.570129   78094 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067528.604385   78096 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067528.627260   78108 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067530.440639   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067530.443038   78133 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067530.472229   78135 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067530.496642   78149 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067532.592436   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067532.595447   78175 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067532.624804   78177 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067532.651114   78191 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067535.999831   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067536.002648   78222 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067536.038204   78224 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067536.062008   78238 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067537.690317   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067537.692866   78262 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067537.721394   78264 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067537.740935   78278 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067539.965861   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067539.968704   78377 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067540.009464   78379 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067540.037366   78383 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+
+========================================================================================================================================================
+  MATCHING GESTURES  (user video vs correct reference)
+========================================================================================================================================================
+User Video           Reference    Strategy              Score%  DTW dist  Eucl dist  Cos sim  Activity  W.usr  W.ref     Frames
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_oko                oko          original               64.8%    0.5137     0.7763   0.8685     1.000  0.384  0.191     129/72
+d_oko                oko          relaxed_distances      69.6%    0.5137     0.7763   0.8685     1.000  0.384  0.191     129/72
+d_oko                oko          lower_activity         64.8%    0.5137     0.7763   0.8685     1.000  0.384  0.191     129/72
+d_oko                oko          cosine_heavy           67.5%    0.5137     0.7763   0.8685     1.000  0.384  0.191     129/72
+d_oko                oko          all_combined           71.4%    0.5137     0.7763   0.8685     1.000  0.384  0.191     129/72
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_oko_left           oko_left     original               26.8%    0.7188     0.9267   0.8394     0.574  0.147  0.374     162/52
+d_oko_left           oko_left     relaxed_distances      28.7%    0.7188     0.9267   0.8394     0.574  0.147  0.374     162/52
+d_oko_left           oko_left     lower_activity         26.8%    0.7188     0.9267   0.8394     0.984  0.147  0.374     162/52
+d_oko_left           oko_left     cosine_heavy           27.8%    0.7188     0.9267   0.8394     0.574  0.147  0.374     162/52
+d_oko_left           oko_left     all_combined           29.3%    0.7188     0.9267   0.8394     0.984  0.147  0.374     162/52
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_oko_side           oko_side     original               68.6%    0.5466     0.6705   0.9406     1.000  0.374  0.265      92/65
+d_oko_side           oko_side     relaxed_distances      73.5%    0.5466     0.6705   0.9406     1.000  0.374  0.265      92/65
+d_oko_side           oko_side     lower_activity         68.6%    0.5466     0.6705   0.9406     1.000  0.374  0.265      92/65
+d_oko_side           oko_side     cosine_heavy           71.2%    0.5466     0.6705   0.9406     1.000  0.374  0.265      92/65
+d_oko_side           oko_side     all_combined           75.2%    0.5466     0.6705   0.9406     1.000  0.374  0.265      92/65
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_dom                dom          original               75.7%    0.4100     0.5551   0.9347     0.676  0.368  0.315     132/67
+d_dom                dom          relaxed_distances      80.3%    0.4100     0.5551   0.9347     0.676  0.368  0.315     132/67
+d_dom                dom          lower_activity         75.7%    0.4100     0.5551   0.9347     1.000  0.368  0.315     132/67
+d_dom                dom          cosine_heavy           77.7%    0.4100     0.5551   0.9347     0.676  0.368  0.315     132/67
+d_dom                dom          all_combined           81.5%    0.4100     0.5551   0.9347     1.000  0.368  0.315     132/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_slovo              slovo        original               59.3%    0.6440     0.9130   0.8462     1.000  0.259  0.135     146/61
+d_slovo              slovo        relaxed_distances      63.7%    0.6440     0.9130   0.8462     1.000  0.259  0.135     146/61
+d_slovo              slovo        lower_activity         59.3%    0.6440     0.9130   0.8462     1.000  0.259  0.135     146/61
+d_slovo              slovo        cosine_heavy           61.7%    0.6440     0.9130   0.8462     1.000  0.259  0.135     146/61
+d_slovo              slovo        all_combined           65.3%    0.6440     0.9130   0.8462     1.000  0.259  0.135     146/61
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_oko                oko          original               49.4%    0.3625     0.5031   0.9260     1.000  0.118  0.191     182/72
+e_oko                oko          relaxed_distances      52.4%    0.3625     0.5031   0.9260     1.000  0.118  0.191     182/72
+e_oko                oko          lower_activity         49.4%    0.3625     0.5031   0.9260     1.000  0.118  0.191     182/72
+e_oko                oko          cosine_heavy           50.6%    0.3625     0.5031   0.9260     1.000  0.118  0.191     182/72
+e_oko                oko          all_combined           53.1%    0.3625     0.5031   0.9260     1.000  0.118  0.191     182/72
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_oko_left           oko_left     original               53.3%    0.6425     0.7789   0.8698     0.213  0.333  0.374     205/52
+e_oko_left           oko_left     relaxed_distances      57.4%    0.6425     0.7789   0.8698     0.213  0.333  0.374     205/52
+e_oko_left           oko_left     lower_activity         53.3%    0.6425     0.7789   0.8698     0.364  0.333  0.374     205/52
+e_oko_left           oko_left     cosine_heavy           55.4%    0.6425     0.7789   0.8698     0.213  0.333  0.374     205/52
+e_oko_left           oko_left     all_combined           58.7%    0.6425     0.7789   0.8698     0.364  0.333  0.374     205/52
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_oko_side           oko_side     original               73.7%    0.4073     0.4705   0.9589     1.000  0.383  0.265     136/65
+e_oko_side           oko_side     relaxed_distances      78.5%    0.4073     0.4705   0.9589     1.000  0.383  0.265     136/65
+e_oko_side           oko_side     lower_activity         73.7%    0.4073     0.4705   0.9589     1.000  0.383  0.265     136/65
+e_oko_side           oko_side     cosine_heavy           75.9%    0.4073     0.4705   0.9589     1.000  0.383  0.265     136/65
+e_oko_side           oko_side     all_combined           79.9%    0.4073     0.4705   0.9589     1.000  0.383  0.265     136/65
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_dom                dom          original               69.6%    0.2400     0.3097   0.9613     0.189  0.355  0.315     213/67
+e_dom                dom          relaxed_distances      74.4%    0.2400     0.3097   0.9613     0.189  0.355  0.315     213/67
+e_dom                dom          lower_activity         69.6%    0.2400     0.3097   0.9613     0.324  0.355  0.315     213/67
+e_dom                dom          cosine_heavy           71.6%    0.2400     0.3097   0.9613     0.189  0.355  0.315     213/67
+e_dom                dom          all_combined           75.5%    0.2400     0.3097   0.9613     0.324  0.355  0.315     213/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_slovo              slovo        original               72.6%    0.2332     0.3097   0.9765     1.000  0.122  0.135     182/61
+e_slovo              slovo        relaxed_distances      76.5%    0.2332     0.3097   0.9765     1.000  0.122  0.135     182/61
+e_slovo              slovo        lower_activity         72.6%    0.2332     0.3097   0.9765     1.000  0.122  0.135     182/61
+e_slovo              slovo        cosine_heavy           74.2%    0.2332     0.3097   0.9765     1.000  0.122  0.135     182/61I0000 00:00:1777067542.446616   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067542.449503   78490 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067542.484403   78492 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067542.506032   78506 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067542.534111   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067542.536610   78526 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067542.567309   78528 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067542.588079   78541 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067543.888416   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067543.890683   78563 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067543.919744   78565 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067543.940633   78579 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067545.335838   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067545.338002   78608 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067545.364443   78610 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067545.385403   78622 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067545.414562   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067545.417074   78644 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067545.458167   78645 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067545.487051   78649 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067546.704189   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067546.706374   78692 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067546.737017   78694 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067546.758759   78695 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067546.796282   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067546.799185   78730 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067546.844403   78732 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067546.870589   78736 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067548.515887   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067548.518455   78771 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067548.555738   78775 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067548.576146   78774 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067548.600761   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067548.603073   78807 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067548.642162   78810 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067548.672200   78812 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067550.286054   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067550.288223   78887 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067550.318867   78889 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067550.339001   78903 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+I0000 00:00:1777067551.921689   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067551.923971   78939 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067551.953019   78942 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067551.973586   78955 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+
+e_slovo              slovo        all_combined           77.4%    0.2332     0.3097   0.9765     1.000  0.122  0.135     182/61
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_hrad_1             hrad         original               76.3%    0.2670     0.3807   0.9666     1.000  0.507  0.517      76/68
+e_hrad_1             hrad         relaxed_distances      80.6%    0.2670     0.3807   0.9666     1.000  0.507  0.517      76/68
+e_hrad_1             hrad         lower_activity         76.3%    0.2670     0.3807   0.9666     1.000  0.507  0.517      76/68
+e_hrad_1             hrad         cosine_heavy           78.1%    0.2670     0.3807   0.9666     1.000  0.507  0.517      76/68
+e_hrad_1             hrad         all_combined           81.7%    0.2670     0.3807   0.9666     1.000  0.507  0.517      76/68
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_hrad_2             hrad         original               55.5%    0.3500     0.5731   0.9041     1.000  0.411  0.517      81/68
+e_hrad_2             hrad         relaxed_distances      59.5%    0.3500     0.5731   0.9041     1.000  0.411  0.517      81/68
+e_hrad_2             hrad         lower_activity         55.5%    0.3500     0.5731   0.9041     1.000  0.411  0.517      81/68
+e_hrad_2             hrad         cosine_heavy           57.3%    0.3500     0.5731   0.9041     1.000  0.411  0.517      81/68
+e_hrad_2             hrad         all_combined           60.5%    0.3500     0.5731   0.9041     1.000  0.411  0.517      81/68
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_hrad_side          hrad_side    original               48.1%    0.2863     0.4627   0.9393     1.000  0.366  0.475      93/67
+e_hrad_side          hrad_side    relaxed_distances      51.9%    0.2863     0.4627   0.9393     1.000  0.366  0.475      93/67
+e_hrad_side          hrad_side    lower_activity         48.1%    0.2863     0.4627   0.9393     1.000  0.366  0.475      93/67
+e_hrad_side          hrad_side    cosine_heavy           50.0%    0.2863     0.4627   0.9393     1.000  0.366  0.475      93/67
+e_hrad_side          hrad_side    all_combined           53.0%    0.2863     0.4627   0.9393     1.000  0.366  0.475      93/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_pes                pes          original               64.1%    0.6614     0.9604   0.8684     0.413  0.230  0.231     108/59
+e_pes                pes          relaxed_distances      68.9%    0.6614     0.9604   0.8684     0.413  0.230  0.231     108/59
+e_pes                pes          lower_activity         64.1%    0.6614     0.9604   0.8684     0.708  0.230  0.231     108/59
+e_pes                pes          cosine_heavy           66.7%    0.6614     0.9604   0.8684     0.413  0.230  0.231     108/59
+e_pes                pes          all_combined           70.6%    0.6614     0.9604   0.8684     0.708  0.230  0.231     108/59
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_pes_side_1         pes_side     original               71.1%    0.3930     0.6049   0.9194     1.000  0.219  0.188      97/60
+e_pes_side_1         pes_side     relaxed_distances      76.1%    0.3930     0.6049   0.9194     1.000  0.219  0.188      97/60
+e_pes_side_1         pes_side     lower_activity         71.1%    0.3930     0.6049   0.9194     1.000  0.219  0.188      97/60
+e_pes_side_1         pes_side     cosine_heavy           73.4%    0.3930     0.6049   0.9194     1.000  0.219  0.188      97/60
+e_pes_side_1         pes_side     all_combined           77.5%    0.3930     0.6049   0.9194     1.000  0.219  0.188      97/60
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_pes_side_2         pes_side     original               64.2%    0.3866     0.5874   0.9282     1.000  0.165  0.188      95/60
+e_pes_side_2         pes_side     relaxed_distances      68.6%    0.3866     0.5874   0.9282     1.000  0.165  0.188      95/60
+e_pes_side_2         pes_side     lower_activity         64.2%    0.3866     0.5874   0.9282     1.000  0.165  0.188      95/60
+e_pes_side_2         pes_side     cosine_heavy           66.2%    0.3866     0.5874   0.9282     1.000  0.165  0.188      95/60
+e_pes_side_2         pes_side     all_combined           69.8%    0.3866     0.5874   0.9282     1.000  0.165  0.188      95/60
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+========================================================================================================================================================
+  STATIC USER 'd_nic'  (no gesture — should score low)
+========================================================================================================================================================
+User Video           Reference    Strategy              Score%  DTW dist  Eucl dist  Cos sim  Activity  W.usr  W.ref     Frames
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                oko          original                7.3%    0.3647     0.5748   0.9117     1.000  0.002  0.191     125/72
+d_nic                oko          relaxed_distances       7.4%    0.3647     0.5748   0.9117     1.000  0.002  0.191     125/72
+d_nic                oko          lower_activity          7.3%    0.3647     0.5748   0.9117     1.000  0.002  0.191     125/72
+d_nic                oko          cosine_heavy            7.3%    0.3647     0.5748   0.9117     1.000  0.002  0.191     125/72
+d_nic                oko          all_combined            7.4%    0.3647     0.5748   0.9117     1.000  0.002  0.191     125/72
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                oko_left     original                3.7%    0.4421     0.6260   0.8780     0.613  0.002  0.374     125/52
+d_nic                oko_left     relaxed_distances       3.7%    0.4421     0.6260   0.8780     0.613  0.002  0.374     125/52
+d_nic                oko_left     lower_activity          3.7%    0.4421     0.6260   0.8780     1.000  0.002  0.374     125/52
+d_nic                oko_left     cosine_heavy            3.7%    0.4421     0.6260   0.8780     0.613  0.002  0.374     125/52
+d_nic                oko_left     all_combined            3.7%    0.4421     0.6260   0.8780     1.000  0.002  0.374     125/52
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                oko_side     original                2.3%    0.7982     1.2132   0.7822     1.000  0.002  0.265     125/65
+d_nic                oko_side     relaxed_distances       2.3%    0.7982     1.2132   0.7822     1.000  0.002  0.265     125/65
+d_nic                oko_side     lower_activity          2.3%    0.7982     1.2132   0.7822     1.000  0.002  0.265     125/65
+d_nic                oko_side     cosine_heavy            2.3%    0.7982     1.2132   0.7822     1.000  0.002  0.265     125/65
+d_nic                oko_side     all_combined            2.4%    0.7982     1.2132   0.7822     1.000  0.002  0.265     125/65
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                dom          original                2.4%    0.7373     1.1325   0.7472     0.551  0.002  0.315     125/67
+I0000 00:00:1777067565.115052   77593 gl_context_egl.cc:85] Successfully initialized EGL. Major : 1 Minor: 5
+I0000 00:00:1777067565.117449   78993 gl_context.cc:369] GL version: 3.2 (OpenGL ES 3.2 Mesa 25.0.7-0ubuntu0.25.04.2), renderer: AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.61, 6.14.0-37-generic)
+W0000 00:00:1777067565.150608   78995 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1777067565.183321   78998 inference_feedback_manager.cc:114] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+d_nic                dom          relaxed_distances       2.4%    0.7373     1.1325   0.7472     0.551  0.002  0.315     125/67
+d_nic                dom          lower_activity          2.4%    0.7373     1.1325   0.7472     0.945  0.002  0.315     125/67
+d_nic                dom          cosine_heavy            2.4%    0.7373     1.1325   0.7472     0.551  0.002  0.315     125/67
+d_nic                dom          all_combined            2.4%    0.7373     1.1325   0.7472     0.945  0.002  0.315     125/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                slovo        original                5.6%    0.4998     0.7436   0.8692     1.000  0.002  0.135     125/61
+d_nic                slovo        relaxed_distances       5.6%    0.4998     0.7436   0.8692     1.000  0.002  0.135     125/61
+d_nic                slovo        lower_activity          5.6%    0.4998     0.7436   0.8692     1.000  0.002  0.135     125/61
+d_nic                slovo        cosine_heavy            5.6%    0.4998     0.7436   0.8692     1.000  0.002  0.135     125/61
+d_nic                slovo        all_combined            5.7%    0.4998     0.7436   0.8692     1.000  0.002  0.135     125/61
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                hrad         original                1.8%    0.8473     1.3082   0.7306     0.721  0.002  0.517     125/68
+d_nic                hrad         relaxed_distances       1.8%    0.8473     1.3082   0.7306     0.721  0.002  0.517     125/68
+d_nic                hrad         lower_activity          1.8%    0.8473     1.3082   0.7306     1.000  0.002  0.517     125/68
+d_nic                hrad         cosine_heavy            1.8%    0.8473     1.3082   0.7306     0.721  0.002  0.517     125/68
+d_nic                hrad         all_combined            1.8%    0.8473     1.3082   0.7306     1.000  0.002  0.517     125/68
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                hrad_2       original                1.7%    0.9406     1.4222   0.6725     0.657  0.002  0.503     125/64
+d_nic                hrad_2       relaxed_distances       1.7%    0.9406     1.4222   0.6725     0.657  0.002  0.503     125/64
+d_nic                hrad_2       lower_activity          1.7%    0.9406     1.4222   0.6725     1.000  0.002  0.503     125/64
+d_nic                hrad_2       cosine_heavy            1.7%    0.9406     1.4222   0.6725     0.657  0.002  0.503     125/64
+d_nic                hrad_2       all_combined            1.7%    0.9406     1.4222   0.6725     1.000  0.002  0.503     125/64
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                hrad_side    original                0.9%    1.3916     2.1375   0.4782     0.833  0.002  0.475     125/67
+d_nic                hrad_side    relaxed_distances       0.9%    1.3916     2.1375   0.4782     0.833  0.002  0.475     125/67
+d_nic                hrad_side    lower_activity          0.9%    1.3916     2.1375   0.4782     1.000  0.002  0.475     125/67
+d_nic                hrad_side    cosine_heavy            0.9%    1.3916     2.1375   0.4782     0.833  0.002  0.475     125/67
+d_nic                hrad_side    all_combined            0.9%    1.3916     2.1375   0.4782     1.000  0.002  0.475     125/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                pes          original                3.0%    0.6419     0.9449   0.8038     0.410  0.002  0.231     125/59
+d_nic                pes          relaxed_distances       3.0%    0.6419     0.9449   0.8038     0.410  0.002  0.231     125/59
+d_nic                pes          lower_activity          3.0%    0.6419     0.9449   0.8038     0.703  0.002  0.231     125/59
+d_nic                pes          cosine_heavy            3.0%    0.6419     0.9449   0.8038     0.410  0.002  0.231     125/59
+d_nic                pes          all_combined            3.0%    0.6419     0.9449   0.8038     0.703  0.002  0.231     125/59
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_nic                pes_side     original                3.9%    1.2878     1.9060   0.4910     0.451  0.002  0.188     125/60
+d_nic                pes_side     relaxed_distances       4.0%    1.2878     1.9060   0.4910     0.451  0.002  0.188     125/60
+d_nic                pes_side     lower_activity          3.9%    1.2878     1.9060   0.4910     0.773  0.002  0.188     125/60
+d_nic                pes_side     cosine_heavy            4.0%    1.2878     1.9060   0.4910     0.451  0.002  0.188     125/60
+d_nic                pes_side     all_combined            4.0%    1.2878     1.9060   0.4910     0.773  0.002  0.188     125/60
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+========================================================================================================================================================
+  CROSS-GESTURE  (user video vs WRONG reference — should score low)
+========================================================================================================================================================
+User Video           Reference    Strategy              Score%  DTW dist  Eucl dist  Cos sim  Activity  W.usr  W.ref     Frames
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_oko                slovo        original               68.3%    0.5412     0.7732   0.9311     1.000  0.384  0.135     129/61
+d_oko                slovo        relaxed_distances      73.2%    0.5412     0.7732   0.9311     1.000  0.384  0.135     129/61
+d_oko                slovo        lower_activity         68.3%    0.5412     0.7732   0.9311     1.000  0.384  0.135     129/61
+d_oko                slovo        cosine_heavy           70.9%    0.5412     0.7732   0.9311     1.000  0.384  0.135     129/61
+d_oko                slovo        all_combined           74.9%    0.5412     0.7732   0.9311     1.000  0.384  0.135     129/61
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_slovo              oko          original               57.0%    0.5852     0.8448   0.8570     1.000  0.259  0.191     146/72
+d_slovo              oko          relaxed_distances      61.1%    0.5852     0.8448   0.8570     1.000  0.259  0.191     146/72
+d_slovo              oko          lower_activity         57.0%    0.5852     0.8448   0.8570     1.000  0.259  0.191     146/72
+d_slovo              oko          cosine_heavy           59.4%    0.5852     0.8448   0.8570     1.000  0.259  0.191     146/72
+d_slovo              oko          all_combined           62.8%    0.5852     0.8448   0.8570     1.000  0.259  0.191     146/72
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_oko                dom          original               17.7%    0.5429     0.7428   0.8343     0.184  0.118  0.315     182/67
+e_oko                dom          relaxed_distances      19.0%    0.5429     0.7428   0.8343     0.184  0.118  0.315     182/67
+e_oko                dom          lower_activity         17.7%    0.5429     0.7428   0.8343     0.315  0.118  0.315     182/67
+e_oko                dom          cosine_heavy           18.4%    0.5429     0.7428   0.8343     0.184  0.118  0.315     182/67
+e_oko                dom          all_combined           19.5%    0.5429     0.7428   0.8343     0.315  0.118  0.315     182/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_dom                oko          original               46.7%    0.5632     0.7329   0.8344     1.000  0.355  0.191     213/72
+e_dom                oko          relaxed_distances      50.5%    0.5632     0.7329   0.8344     1.000  0.355  0.191     213/72
+e_dom                oko          lower_activity         46.7%    0.5632     0.7329   0.8344     1.000  0.355  0.191     213/72
+e_dom                oko          cosine_heavy           48.7%    0.5632     0.7329   0.8344     1.000  0.355  0.191     213/72
+e_dom                oko          all_combined           51.8%    0.5632     0.7329   0.8344     1.000  0.355  0.191     213/72
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+d_dom                slovo        original               51.2%    0.7489     1.0037   0.7823     1.000  0.368  0.135     132/61
+d_dom                slovo        relaxed_distances      55.1%    0.7489     1.0037   0.7823     1.000  0.368  0.135     132/61
+d_dom                slovo        lower_activity         51.2%    0.7489     1.0037   0.7823     1.000  0.368  0.135     132/61
+d_dom                slovo        cosine_heavy           53.4%    0.7489     1.0037   0.7823     1.000  0.368  0.135     132/61
+d_dom                slovo        all_combined           56.7%    0.7489     1.0037   0.7823     1.000  0.368  0.135     132/61
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_slovo              dom          original               19.3%    0.5055     0.6916   0.8435     0.197  0.122  0.315     182/67
+e_slovo              dom          relaxed_distances      20.7%    0.5055     0.6916   0.8435     0.197  0.122  0.315     182/67
+e_slovo              dom          lower_activity         19.3%    0.5055     0.6916   0.8435     0.337  0.122  0.315     182/67
+e_slovo              dom          cosine_heavy           20.0%    0.5055     0.6916   0.8435     0.197  0.122  0.315     182/67
+e_slovo              dom          all_combined           21.2%    0.5055     0.6916   0.8435     0.337  0.122  0.315     182/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_hrad_1             dom          original               62.2%    0.5860     0.9208   0.8086     1.000  0.507  0.315      76/67
+e_hrad_1             dom          relaxed_distances      67.0%    0.5860     0.9208   0.8086     1.000  0.507  0.315      76/67
+e_hrad_1             dom          lower_activity         62.2%    0.5860     0.9208   0.8086     1.000  0.507  0.315      76/67
+e_hrad_1             dom          cosine_heavy           64.6%    0.5860     0.9208   0.8086     1.000  0.507  0.315      76/67
+e_hrad_1             dom          all_combined           68.6%    0.5860     0.9208   0.8086     1.000  0.507  0.315      76/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_hrad_1             pes          original               53.0%    0.8144     1.4467   0.6625     0.834  0.507  0.231      76/59
+e_hrad_1             pes          relaxed_distances      56.8%    0.8144     1.4467   0.6625     0.834  0.507  0.231      76/59
+e_hrad_1             pes          lower_activity         53.0%    0.8144     1.4467   0.6625     1.000  0.507  0.231      76/59
+e_hrad_1             pes          cosine_heavy           55.3%    0.8144     1.4467   0.6625     0.834  0.507  0.231      76/59
+e_hrad_1             pes          all_combined           58.5%    0.8144     1.4467   0.6625     1.000  0.507  0.231      76/59
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_pes                hrad         original               28.2%    0.6006     0.9523   0.8367     0.726  0.230  0.517     108/68
+e_pes                hrad         relaxed_distances      30.4%    0.6006     0.9523   0.8367     0.726  0.230  0.517     108/68
+e_pes                hrad         lower_activity         28.2%    0.6006     0.9523   0.8367     1.000  0.230  0.517     108/68
+e_pes                hrad         cosine_heavy           29.3%    0.6006     0.9523   0.8367     0.726  0.230  0.517     108/68
+e_pes                hrad         all_combined           31.1%    0.6006     0.9523   0.8367     1.000  0.230  0.517     108/68
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+e_pes                dom          original               37.8%    0.8838     1.2677   0.7418     0.555  0.230  0.315     108/67
+e_pes                dom          relaxed_distances      40.8%    0.8838     1.2677   0.7418     0.555  0.230  0.315     108/67
+e_pes                dom          lower_activity         37.8%    0.8838     1.2677   0.7418     0.952  0.230  0.315     108/67
+e_pes                dom          cosine_heavy           39.5%    0.8838     1.2677   0.7418     0.555  0.230  0.315     108/67
+e_pes                dom          all_combined           41.9%    0.8838     1.2677   0.7418     0.952  0.230  0.315     108/67
+--------------------------------------------------------------------------------------------------------------------------------------------------------
