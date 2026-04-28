@@ -6,10 +6,10 @@ import os
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from dtwAlignment.visualize_dtw_alignment import visualize_with_options
+from visualize_dtw_alignment import visualize_with_options
 
-PAIRS = [
-    # Matching gestures
+MATCHING_PAIRS = [
+    # user video stem      reference gesture
     ("d_oko", "oko"),
     ("d_oko_left", "oko_left"),
     ("d_oko_side", "oko_side"),
@@ -20,38 +20,38 @@ PAIRS = [
     ("e_oko_side", "oko_side"),
     ("e_dom", "dom"),
     ("e_slovo", "slovo"),
-    # Static user
-    ("d_nic", "oko"),
-    ("d_nic", "oko_left"),
-    ("d_nic", "oko_side"),
-    ("d_nic", "dom"),
-    ("d_nic", "slovo"),
-    # Cross-gesture
-    ("d_oko", "slovo"),
-    ("d_slovo", "oko"),
-    ("e_oko", "dom"),
-    ("e_dom", "oko"),
-    ("d_dom", "slovo"),
-    ("e_slovo", "dom"),
+    ("e_hrad_1", "hrad"),
+    ("e_hrad_2", "hrad"),
+    ("e_hrad_side", "hrad_side"),
+    ("e_pes", "pes"),
+    ("e_pes_side_1", "pes_side"),
+    ("e_pes_side_2", "pes_side"),
 ]
 
-out_dir = os.path.join(ROOT, "dtw_visualizations")
-os.makedirs(out_dir, exist_ok=True)
-# Change to the output dir so visualize() saves PNGs there
-os.chdir(ROOT)
+ALL_REFERENCES = [
+    "oko",
+    "oko_left",
+    "oko_side",
+    "dom",
+    "slovo",
+    "hrad",
+    "hrad_2",
+    "hrad_side",
+    "pes",
+    "pes_side",
+]
+
+STATIC_PAIRS = [("d_nic", ref) for ref in ALL_REFERENCES]
+
+PAIRS = MATCHING_PAIRS + STATIC_PAIRS
+
+# CWD must be the code root so HandAnnotation can find hand_landmarker.task
+CODE_ROOT = os.path.dirname(ROOT)
+os.chdir(CODE_ROOT)
 
 for user_stem, ref_gesture in PAIRS:
     print(f"\n=== {user_stem} vs {ref_gesture} ===")
     try:
-        # Wrist trajectory OFF
-        visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix="wrist_off")
-        png_off = f"dtw_alignment_{user_stem}_vs_{ref_gesture}_wrist_off.png"
-        if os.path.isfile(png_off):
-            os.rename(png_off, os.path.join(out_dir, png_off))
-        # Wrist trajectory ON
-        visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=True, output_suffix="wrist_on")
-        png_on = f"dtw_alignment_{user_stem}_vs_{ref_gesture}_wrist_on.png"
-        if os.path.isfile(png_on):
-            os.rename(png_on, os.path.join(out_dir, png_on))
+        visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix=None)
     except Exception as e:
         print(f"ERROR: {e}")

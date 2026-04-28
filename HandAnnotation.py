@@ -124,6 +124,24 @@ class HandAnnotation:
     # Landmark extraction and drawing
     # ------------------------------------------------------------------
 
+    def _sortedHandLandmarks(self, detectionResult):
+        """Return hand landmarks sorted so Left is always at index 0 and Right at index 1.
+
+        MediaPipe returns hands in arbitrary detection order. Sorting by handedness label
+        ensures a consistent hand-to-index mapping across different videos, preventing
+        left/right swaps from corrupting comparisons.
+
+        Returns:
+            List of hand landmark sequences (MediaPipe objects) sorted by handedness label
+            ascending ("Left" before "Right").
+        """
+        landmarks = detectionResult.hand_landmarks
+        handedness = detectionResult.handedness
+        if not landmarks:
+            return landmarks
+        paired = sorted(zip(handedness, landmarks), key=lambda p: p[0][0].category_name)
+        return [p[1] for p in paired]
+
     def extractHandLandmarkProtos(self, detectionResult):
         """Convert MediaPipe detection landmarks into NormalizedLandmarkList protos for drawing."""
         handLandmarksList = detectionResult.hand_landmarks
@@ -143,9 +161,12 @@ class HandAnnotation:
 
     def drawLandmarksOnImage(self, rgbImage, detectionResult):
         """Overlay detected hand landmarks, connections, and handedness labels onto the image."""
+        # Sort hands by handedness so Left is always index 0, Right always index 1.
+        sortedHands = self._sortedHandLandmarks(detectionResult)
+
         # Store original wrist positions before normalization
         self.wristTrajectoryList = []
-        original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in detectionResult.hand_landmarks]
+        original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in sortedHands]
         self.currentWristPositions = []
         for coords in original_coords:
             if coords.shape[0] > LandmarkIndices.WRIST:
@@ -157,7 +178,7 @@ class HandAnnotation:
                 self.currentWristPositions.append(None)
 
         # Normalize landmarks: translate (wrist-centered) then scale (hand-size invariant)
-        translated = [self._getTranslatedLandmarks(hand) for hand in detectionResult.hand_landmarks]
+        translated = [self._getTranslatedLandmarks(hand) for hand in sortedHands]
         normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]
         self.handLandmarksList = self._landmarksToDict(normalized)
         annotatedImage = np.copy(rgbImage)
@@ -215,13 +236,16 @@ class HandAnnotation:
 
         detectionResult = self.detector.detect(image)
 
+        # Sort hands by handedness so Left is always index 0, Right always index 1.
+        sortedHands = self._sortedHandLandmarks(detectionResult)
+
         # Always compute and store normalized landmarks for downstream scoring.
-        translated = [self._getTranslatedLandmarks(hand) for hand in detectionResult.hand_landmarks]
+        translated = [self._getTranslatedLandmarks(hand) for hand in sortedHands]
         normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]
         self.handLandmarksList = self._landmarksToDict(normalized)
 
         # Always update raw wrist positions so scoring has them even when drawing is off.
-        original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in detectionResult.hand_landmarks]
+        original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in sortedHands]
         self.currentWristPositions = []
         for coords in original_coords:
             if coords.shape[0] > LandmarkIndices.WRIST:

@@ -28,7 +28,7 @@ from Scoring import Scoring
 N_LANDMARKS = 21
 
 
-def make_sequence(x_values: list) -> list:
+def make_sequence(x_values):
     """Build a sequence from a list of X positions for landmark 8.
 
     All other landmarks are stationary at (0.5, 0.5 - lm*0.01, 0).
@@ -85,7 +85,7 @@ def run_dtw(scorer: Scoring, seq1: list, seq2: list, hand_weights: list):
     path.append((0, 0))
     path.reverse()
 
-    dtw_dist = scorer._dtwDistance(seq1, seq2, hand_weights)
+    dtw_dist, _ = scorer._dtwWithPath(seq1, seq2, hand_weights)
     return acc, local, path, dtw_dist
 
 

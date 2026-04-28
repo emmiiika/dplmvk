@@ -211,6 +211,69 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ref_wx = [w[wrist_hand_idx][0] for w in raw_ref_wrists if w[wrist_hand_idx] is not None]
     ref_wy = [w[wrist_hand_idx][1] for w in raw_ref_wrists if w[wrist_hand_idx] is not None]
 
+    # Wrist max displacement (user vs reference, dominant hand)
+    user_wrist_disp = scorer._wristMaxDispFromRawSeq(raw_user_wrists, hand_weights)
+    ref_wrist_disp = scorer._wristMaxDispFromRawSeq(raw_ref_wrists, hand_weights)
+
+    # Wrist trajectory score — replicate Scoring.calculateScore wrist block
+    def _wrist_score(raw_user, raw_ref, hw):
+        """Compute the wrist trajectory similarity score (0–1) from raw wrist sequences."""
+        minLen = min(len(raw_user), len(raw_ref))
+        if minLen <= 2:
+            return None
+
+        def to_deltas(traj_col):
+            deltas = []
+            for i in range(1, len(traj_col)):
+                prev, curr = traj_col[i - 1], traj_col[i]
+                if prev is not None and curr is not None:
+                    deltas.append(np.array(curr, dtype=float) - np.array(prev, dtype=float))
+                else:
+                    deltas.append(None)
+            return deltas
+
+        u0 = to_deltas([r[0] for r in raw_user[:minLen]])
+        u1 = to_deltas([r[1] for r in raw_user[:minLen]])
+        r0 = to_deltas([r[0] for r in raw_ref[:minLen]])
+        r1 = to_deltas([r[1] for r in raw_ref[:minLen]])
+        delta_len = len(u0)
+
+        def to_arr(pt):
+            return pt.reshape(1, 3) if pt is not None else None
+
+        seq1 = [(to_arr(u0[i]), to_arr(u1[i])) for i in range(delta_len)]
+        seq2 = [(to_arr(r0[i]), to_arr(r1[i])) for i in range(delta_len)]
+
+        dtw_dist, _ = scorer._dtwWithPath(seq1, seq2, handWeights=hw)
+        dtw_sim = scorer._distanceToSimilarity(dtw_dist, maxPossibleDistance=0.05)
+
+        eucl_sims = []
+        for idx, (ud, rd) in enumerate([(u0, r0), (u1, r1)]):
+            w = hw[idx]
+            if w <= 0:
+                continue
+            pairs = [(u, r) for u, r in zip(ud, rd) if u is not None and r is not None]
+            if pairs:
+                dists = [np.linalg.norm(u - r) for u, r in pairs]
+                eucl_sims.append(w * scorer._distanceToSimilarity(float(np.mean(dists)), maxPossibleDistance=0.05))
+        if eucl_sims:
+            weight_sum = sum(hw[i] for i in range(2) if hw[i] > 0 and eucl_sims)
+            eucl_sim = sum(eucl_sims) / weight_sum if weight_sum > 0 else 0.0
+        else:
+            eucl_sim = 0.0
+
+        return 0.6 * dtw_sim + 0.4 * eucl_sim
+
+    wrist_score = _wrist_score(raw_user_wrists, raw_ref_wrists, hand_weights)
+
+    # Euclidean similarity (converted from mean frame distance)
+    euclid_sim = scorer._distanceToSimilarity(
+        float(np.mean(euclid_curve)), maxPossibleDistance=scorer.strategy["euclideanMaxDistance"]
+    )
+
+    # Cosine similarity (mean over aligned frames)
+    cosine_sim = float(np.mean(cosine_curve))
+
     # ── Plot ──────────────────────────────────────────────────────────────────
     fig = plt.figure(figsize=(16, 18))
     fig.suptitle(
@@ -295,6 +358,19 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_wrist.set_title(f"Wrist 2D Trajectory (hand {wrist_hand_idx}, ○=start ■=end)")
     ax_wrist.legend(fontsize=8)
     ax_wrist.set_aspect("equal", adjustable="datalim")
+    _u = f"{user_wrist_disp:.3f}" if user_wrist_disp is not None else "N/A"
+    _r = f"{ref_wrist_disp:.3f}" if ref_wrist_disp is not None else "N/A"
+    _ws = f"{wrist_score * 100:.1f}%" if wrist_score is not None else "N/A"
+    ax_wrist.text(
+        0.02,
+        0.02,
+        f"max disp — user: {_u}  ref: {_r}\nwrist score: {_ws}",
+        transform=ax_wrist.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=9,
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.85),
+    )
 
     # 4. Per-frame Euclidean distance (DTW-aligned)
     ax_euclid = fig.add_subplot(gs[2, 1])
@@ -306,6 +382,17 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_euclid.set_ylabel("Weighted distance")
     ax_euclid.set_title("Per-Frame Euclidean Distance (aligned)")
     ax_euclid.legend(fontsize=8)
+    ax_euclid.text(
+        0.98,
+        0.98,
+        f"Euclid sim: {euclid_sim * 100:.1f}%",
+        transform=ax_euclid.transAxes,
+        ha="right",
+        va="top",
+        fontsize=10,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="honeydew", alpha=0.9),
+    )
 
     # 5. Per-frame Cosine similarity (DTW-aligned)
     ax_cos = fig.add_subplot(gs[3, 0:2])
@@ -318,6 +405,17 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_cos.set_ylabel("Cosine similarity (0–1)")
     ax_cos.set_title("Per-Frame Cosine Similarity (aligned)")
     ax_cos.legend(fontsize=8)
+    ax_cos.text(
+        0.98,
+        0.98,
+        f"Cos sim: {cosine_sim * 100:.1f}%",
+        transform=ax_cos.transAxes,
+        ha="right",
+        va="top",
+        fontsize=10,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="mistyrose", alpha=0.9),
+    )
 
     suffix = f"_{output_suffix}" if output_suffix else ""
     out_path = os.path.join(_SCRIPT_DIR, f"dtw_alignment_{user_stem}_vs_{ref_gesture}{suffix}.png")

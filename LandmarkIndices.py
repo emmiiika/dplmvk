@@ -1,4 +1,6 @@
 class LandmarkIndices:
+    """Named integer constants for MediaPipe hand landmark indices (0-based)."""
+
     WRIST = 0
     THUMB_CMC = 1
     THUMB_MCP = 2

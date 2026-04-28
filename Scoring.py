@@ -789,7 +789,7 @@ class Scoring:
         refFrames = self._extractPerHandArrays(referenceSequence)
 
         if len(userFrames) == 0 or len(refFrames) == 0:
-            return 0.0
+            return 0.0, [0.5, 0.5]
 
         # Compute per-hand motion from reference gesture and use it as comparison weight.
         # If one hand moves more, it gets higher weight.
@@ -851,7 +851,7 @@ class Scoring:
         # Only applied when refMaxDisp is large enough that the reference is a
         # moving gesture — static pose gestures naturally have small refMaxDisp.
         refMaxDisp = self._wristMaxDispFromRawSeq(rawRefWrists, handWeights)
-        if refMaxDisp is not None and refMaxDisp > 0.05:
+        if refMaxDisp is not None:
             userMaxDisp = self._wristMaxDispFromRawSeq(rawUserWrists, handWeights)
             if userMaxDisp is not None:
                 displacementFactor = min(1.0, userMaxDisp / refMaxDisp)
@@ -870,7 +870,7 @@ class Scoring:
         print(f"  Euclidean similarity: {euclideanSimilarity:.4f}")
         print(f"  Cosine similarity: {cosineSim:.4f}")
 
-        return combinedScore
+        return combinedScore, handWeights
 
     def calculateScore(self, userLandmarks=None, includeWristTrajectory=True, wristWeight=0.1):
         """Calculate similarity score between user landmarks and reference landmarks.
@@ -903,7 +903,7 @@ class Scoring:
             return 0.0
 
         # Calculate hand shape similarity score
-        score = self._calculateSequenceSimilarity(userLandmarks, referenceLandmarks)
+        score, handWeights = self._calculateSequenceSimilarity(userLandmarks, referenceLandmarks)
 
         # Optionally add wrist trajectory similarity
         if includeWristTrajectory:
@@ -911,11 +911,7 @@ class Scoring:
             refWrist0, refWrist1 = self._extractWristTrajectory(self.referenceAnnotation)
             minLen = min(len(userWrist0), len(refWrist0))
             if minLen > 2:
-                # Derive hand weights from reference wrist presence (uses absolute positions).
-                pres0 = sum(1 for p in refWrist0[:minLen] if p is not None)
-                pres1 = sum(1 for p in refWrist1[:minLen] if p is not None)
-                presSum = pres0 + pres1
-                wristHandWeights = [pres0 / presSum, pres1 / presSum] if presSum > 0 else [0.5, 0.5]
+                wristHandWeights = handWeights
 
                 # Convert absolute positions to per-frame displacement vectors so the
                 # comparison measures movement pattern, not screen location.
