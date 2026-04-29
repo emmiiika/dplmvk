@@ -35,7 +35,6 @@ ALL_REFERENCES = [
     "dom",
     "slovo",
     "hrad",
-    "hrad_2",
     "hrad_side",
     "pes",
     "pes_side",
@@ -52,6 +51,6 @@ os.chdir(CODE_ROOT)
 for user_stem, ref_gesture in PAIRS:
     print(f"\n=== {user_stem} vs {ref_gesture} ===")
     try:
-        visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix=None)
+        visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=True, output_suffix=None)
     except Exception as e:
         print(f"ERROR: {e}")

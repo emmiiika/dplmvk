@@ -8,41 +8,31 @@ import math
 #   different scoring parameters without changing the code.
 SCORING_STRATEGIES = {
     "original": {
-        "dtwMaxDistance": 2.0,
         "euclideanMaxDistance": 1.5,
-        "dtwWeight": 0.55,
         "euclideanWeight": 0.10,
         "cosineWeight": 0.35,
         "activityThreshold": 0.6,
     },
     "relaxed_distances": {
-        "dtwMaxDistance": 3.5,
         "euclideanMaxDistance": 3.0,
-        "dtwWeight": 0.55,
         "euclideanWeight": 0.10,
         "cosineWeight": 0.35,
         "activityThreshold": 0.6,
     },
     "lower_activity": {
-        "dtwMaxDistance": 2.0,
         "euclideanMaxDistance": 1.5,
-        "dtwWeight": 0.55,
         "euclideanWeight": 0.10,
         "cosineWeight": 0.35,
         "activityThreshold": 0.35,
     },
     "cosine_heavy": {
-        "dtwMaxDistance": 2.0,
         "euclideanMaxDistance": 1.5,
-        "dtwWeight": 0.45,
         "euclideanWeight": 0.10,
         "cosineWeight": 0.45,
         "activityThreshold": 0.6,
     },
     "all_combined": {
-        "dtwMaxDistance": 3.5,
         "euclideanMaxDistance": 3.0,
-        "dtwWeight": 0.45,
         "euclideanWeight": 0.10,
         "cosineWeight": 0.45,
         "activityThreshold": 0.35,

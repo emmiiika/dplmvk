@@ -24,7 +24,7 @@ INCLUDE_WRIST_TRAJECTORY = True  # Set True to enable wrist trajectory blending
 WRIST_WEIGHT = 0.1  # Default blend weight for wrist trajectory (matches UI)
 
 # Reference gestures available (stem names matching .mp4 files in REFERENCE_FOLDER)
-GESTURES = ["oko", "oko_left", "oko_side", "dom", "slovo", "hrad", "hrad_2", "hrad_side", "pes", "pes_side"]
+GESTURES = ["oko", "oko_left", "oko_side", "dom", "slovo", "hrad", "hrad_side", "pes", "pes_side"]
 
 # Map recorded filename stems to the reference gesture they attempted.
 # Naming convention: {user}_{gesture}[_variant].avi

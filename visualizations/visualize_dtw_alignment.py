@@ -206,10 +206,15 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     raw_user_wrists = scorer._extractRawWristSequences(user_ann.handLandmarksTimestamped)
     raw_ref_wrists = scorer._extractRawWristSequences(ref_seq)
     wrist_hand_idx = 0 if hand_weights[0] >= hand_weights[1] else 1
+    wrist_hand_idx2 = 1 - wrist_hand_idx
     user_wx = [w[wrist_hand_idx][0] for w in raw_user_wrists if w[wrist_hand_idx] is not None]
     user_wy = [w[wrist_hand_idx][1] for w in raw_user_wrists if w[wrist_hand_idx] is not None]
     ref_wx = [w[wrist_hand_idx][0] for w in raw_ref_wrists if w[wrist_hand_idx] is not None]
     ref_wy = [w[wrist_hand_idx][1] for w in raw_ref_wrists if w[wrist_hand_idx] is not None]
+    user_wx2 = [w[wrist_hand_idx2][0] for w in raw_user_wrists if w[wrist_hand_idx2] is not None]
+    user_wy2 = [w[wrist_hand_idx2][1] for w in raw_user_wrists if w[wrist_hand_idx2] is not None]
+    ref_wx2 = [w[wrist_hand_idx2][0] for w in raw_ref_wrists if w[wrist_hand_idx2] is not None]
+    ref_wy2 = [w[wrist_hand_idx2][1] for w in raw_ref_wrists if w[wrist_hand_idx2] is not None]
 
     # Wrist max displacement (user vs reference, dominant hand)
     user_wrist_disp = scorer._wristMaxDispFromRawSeq(raw_user_wrists, hand_weights)
@@ -343,6 +348,7 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_y.legend(fontsize=8)
 
     # 3. Wrist 2D trajectory (dominant hand, raw screen-space x/y)
+    hand1_label = "Left" if wrist_hand_idx == 0 else "Right"
     ax_wrist = fig.add_subplot(gs[2, 0])
     if user_wx:
         ax_wrist.plot(user_wx, user_wy, color="steelblue", label=f"User ({user_stem})", linewidth=1.2)
@@ -355,7 +361,7 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_wrist.invert_yaxis()  # screen-space: y=0 is top
     ax_wrist.set_xlabel("X (screen)")
     ax_wrist.set_ylabel("Y (screen, inverted)")
-    ax_wrist.set_title(f"Wrist 2D Trajectory (hand {wrist_hand_idx}, ○=start ■=end)")
+    ax_wrist.set_title(f"Wrist 2D Trajectory (hand {wrist_hand_idx} — {hand1_label}, ○=start ■=end)")
     ax_wrist.legend(fontsize=8)
     ax_wrist.set_aspect("equal", adjustable="datalim")
     _u = f"{user_wrist_disp:.3f}" if user_wrist_disp is not None else "N/A"
@@ -372,8 +378,37 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
         bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.85),
     )
 
+    # 3b. Wrist 2D trajectory (other hand)
+    ax_wrist2 = fig.add_subplot(gs[2, 1])
+    hand2_label = "Left" if wrist_hand_idx2 == 0 else "Right"
+    if user_wx2:
+        ax_wrist2.plot(user_wx2, user_wy2, color="steelblue", label=f"User ({user_stem})", linewidth=1.2)
+        ax_wrist2.plot(user_wx2[0], user_wy2[0], "o", color="steelblue", markersize=6)
+        ax_wrist2.plot(user_wx2[-1], user_wy2[-1], "s", color="steelblue", markersize=6)
+    if ref_wx2:
+        ax_wrist2.plot(ref_wx2, ref_wy2, color="darkorange", label=f"Reference ({ref_gesture})", linewidth=1.2)
+        ax_wrist2.plot(ref_wx2[0], ref_wy2[0], "o", color="darkorange", markersize=6)
+        ax_wrist2.plot(ref_wx2[-1], ref_wy2[-1], "s", color="darkorange", markersize=6)
+    if not user_wx2 and not ref_wx2:
+        ax_wrist2.text(
+            0.5,
+            0.5,
+            "No data (hand not detected)",
+            transform=ax_wrist2.transAxes,
+            ha="center",
+            va="center",
+            fontsize=10,
+            color="gray",
+        )
+    ax_wrist2.invert_yaxis()
+    ax_wrist2.set_xlabel("X (screen)")
+    ax_wrist2.set_ylabel("Y (screen, inverted)")
+    ax_wrist2.set_title(f"Wrist 2D Trajectory (hand {wrist_hand_idx2} — {hand2_label}, ○=start ■=end)")
+    ax_wrist2.legend(fontsize=8)
+    ax_wrist2.set_aspect("equal", adjustable="datalim")
+
     # 4. Per-frame Euclidean distance (DTW-aligned)
-    ax_euclid = fig.add_subplot(gs[2, 1])
+    ax_euclid = fig.add_subplot(gs[3, 0])
     ax_euclid.plot(euclid_curve, color="mediumseagreen")
     ax_euclid.axhline(
         np.mean(euclid_curve), color="darkgreen", linestyle="--", linewidth=1, label=f"mean={np.mean(euclid_curve):.3f}"
@@ -395,7 +430,7 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     )
 
     # 5. Per-frame Cosine similarity (DTW-aligned)
-    ax_cos = fig.add_subplot(gs[3, 0:2])
+    ax_cos = fig.add_subplot(gs[3, 1])
     ax_cos.plot(cosine_curve, color="coral")
     ax_cos.axhline(
         np.mean(cosine_curve), color="darkred", linestyle="--", linewidth=1, label=f"mean={np.mean(cosine_curve):.3f}"
