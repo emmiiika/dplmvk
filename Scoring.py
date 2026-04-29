@@ -9,33 +9,45 @@ import math
 SCORING_STRATEGIES = {
     "original": {
         "euclideanMaxDistance": 1.5,
-        "euclideanWeight": 0.10,
-        "cosineWeight": 0.35,
+        "euclideanWeight": 0.22,
+        "cosineWeight": 0.78,
         "activityThreshold": 0.6,
     },
     "relaxed_distances": {
         "euclideanMaxDistance": 3.0,
-        "euclideanWeight": 0.10,
-        "cosineWeight": 0.35,
+        "euclideanWeight": 0.22,
+        "cosineWeight": 0.78,
         "activityThreshold": 0.6,
     },
     "lower_activity": {
         "euclideanMaxDistance": 1.5,
-        "euclideanWeight": 0.10,
-        "cosineWeight": 0.35,
+        "euclideanWeight": 0.22,
+        "cosineWeight": 0.78,
         "activityThreshold": 0.35,
     },
     "cosine_heavy": {
         "euclideanMaxDistance": 1.5,
-        "euclideanWeight": 0.10,
-        "cosineWeight": 0.45,
+        "euclideanWeight": 0.18,
+        "cosineWeight": 0.82,
         "activityThreshold": 0.6,
     },
     "all_combined": {
         "euclideanMaxDistance": 3.0,
-        "euclideanWeight": 0.10,
-        "cosineWeight": 0.45,
+        "euclideanWeight": 0.18,
+        "cosineWeight": 0.82,
         "activityThreshold": 0.35,
+    },
+    "strict_euclidean": {
+        "euclideanMaxDistance": 0.5,
+        "euclideanWeight": 0.22,
+        "cosineWeight": 0.78,
+        "activityThreshold": 0.6,
+    },
+    "euclid_heavy": {
+        "euclideanMaxDistance": 1.5,
+        "euclideanWeight": 0.40,
+        "cosineWeight": 0.60,
+        "activityThreshold": 0.6,
     },
 }
 
@@ -814,13 +826,8 @@ class Scoring:
         # Method 3: Cosine similarity on DTW-aligned frames
         cosineSim = self._averageCosineSimilarity(alignedUserFrames, alignedRefFrames, handWeights)
 
-        # Combine metrics with weights (DTW similarity excluded; weights normalized).
-        euclideanCosineWeight = s["euclideanWeight"] + s["cosineWeight"]
-        combinedScore = (
-            (s["euclideanWeight"] * euclideanSimilarity + s["cosineWeight"] * cosineSim) / euclideanCosineWeight
-            if euclideanCosineWeight > 0
-            else 0.0
-        )
+        # Combine metrics with weights (weights sum to 1.0 by convention).
+        combinedScore = s["euclideanWeight"] * euclideanSimilarity + s["cosineWeight"] * cosineSim
 
         # Motion-activity penalty:
         # If the reference contains meaningful motion, but the user sequence stays

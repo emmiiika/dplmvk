@@ -19,9 +19,9 @@ def score(reference_seq, candidate_seq):
 
 def main():
     files = {
-        "oko_front": "../videa/.annotated/oko - (360p)_annotated_handLandmarks.json",
-        "oko_side": "../videa/.annotated/oko - zboku - (360p)_annotated_handLandmarks.json",
-        "oko_left": "../videa/.annotated/oko - lava - (360p)_annotated_handLandmarks.json",
+        "oko_front": "../videos/.annotated/oko - (360p)_annotated_handLandmarks.json",
+        "oko_side": "../videos/.annotated/oko - zboku - (360p)_annotated_handLandmarks.json",
+        "oko_left": "../videos/.annotated/oko - lava - (360p)_annotated_handLandmarks.json",
     }
 
     sequences = {name: load_sequence(path) for name, path in files.items()}

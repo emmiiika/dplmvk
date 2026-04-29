@@ -59,10 +59,10 @@ def transform_landmarks_sequence(sequence, rotation_degrees=8.0, zoom_factor=1.0
 
 
 def main():
-    files = sorted(glob.glob("../videa/.annotated/*_handLandmarks.json"))
+    files = sorted(glob.glob("../videos/.annotated/*_handLandmarks.json"))
 
     if not files:
-        print("No reference landmark files found in ../videa/.annotated")
+        print("No reference landmark files found in ../videos/.annotated")
         return 1
 
     print("Self-scoring sanity check: reference sequence compared with itself")

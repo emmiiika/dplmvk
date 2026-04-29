@@ -8,8 +8,9 @@ from Scoring import Scoring
 
 DEFAULT_WEBCAM_VIDEO = "/home/emmika/Videos/Screencasts/Screencast From 2026-04-13 15-29-13.mp4"
 DEFAULT_REFERENCE_VIDEO = "slovo"
-DEFAULT_REFERENCE_FOLDER = "../videa"
-DEFAULT_ANNOTATED_FOLDER = "../videa/.annotated"
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_REFERENCE_FOLDER = os.path.join(_SCRIPT_DIR, "../videos/referenceVideos")
+DEFAULT_ANNOTATED_FOLDER = os.path.join(_SCRIPT_DIR, "../videos/.annotated")
 
 
 def resolve_reference_video(reference_arg, reference_folder):

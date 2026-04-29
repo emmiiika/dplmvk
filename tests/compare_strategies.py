@@ -14,9 +14,11 @@ from HandAnnotation import HandAnnotation
 from Scoring import Scoring, SCORING_STRATEGIES
 
 
-REFERENCE_FOLDER = "../videa"
-ANNOTATED_FOLDER = "../videa/.annotated"
-RECORDED_FOLDER = "../videa/.recorded"
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+REFERENCE_FOLDER = os.path.join(_SCRIPT_DIR, "../videos/referenceVideos")
+ANNOTATED_FOLDER = os.path.join(_SCRIPT_DIR, "../videos/.annotated")
+RECORDED_FOLDER = os.path.join(_SCRIPT_DIR, "../videos/.recorded")
 
 # ---- Scoring config ----
 # Set these for batch runs to control wrist trajectory blending
@@ -48,8 +50,8 @@ MATCHING_PAIRS = [
     ("e_pes_side_2", "pes_side"),
 ]
 
-# Static user (does nothing) — compare against every reference
-STATIC_VIDEO = "d_nic"
+# Static/non-gesture users — compare against every reference (should all score low)
+STATIC_VIDEOS = ["d_nic", "e_right_up", "e_both_up"]
 
 # Cross-gesture comparisons (user video vs WRONG reference)
 CROSS_PAIRS = [
@@ -113,7 +115,19 @@ def resolve_recorded(stem):
 
 
 def resolve_reference(gesture):
-    return os.path.abspath(os.path.join(REFERENCE_FOLDER, f"{gesture}.mp4"))
+    filename_map = {
+        "oko": "oko_right",
+        "oko_left": "oko_left",
+        "oko_side": "oko_right_side",
+        "dom": "dom_both",
+        "slovo": "slovo_right",
+        "hrad": "hrad_both",
+        "hrad_side": "hrad_both_side",
+        "pes": "pes_both",
+        "pes_side": "pes_both_side",
+    }
+    filename = filename_map.get(gesture, gesture)
+    return os.path.abspath(os.path.join(REFERENCE_FOLDER, f"{filename}.mp4"))
 
 
 def score_pair(user_path, ref_path, strategy_name):
@@ -254,20 +268,21 @@ def main():
             print_row(user_stem, ref_gesture, strat, m)
         _real_print(SEP)
 
-    # ── Section 2: Static user (d_nic) vs every reference ──
-    print_header("STATIC USER 'd_nic'  (no gesture — should score low)")
+    # ── Section 2: Static/non-gesture users vs every reference ──
+    print_header("NON-GESTURE VIDEOS  (no valid gesture — should score low)")
     print_table_header()
 
-    static_path = resolve_recorded(STATIC_VIDEO)
-    for ref_gesture in GESTURES:
-        ref_path = resolve_reference(ref_gesture)
-        if not os.path.isfile(static_path) or not os.path.isfile(ref_path):
-            _real_print(f"  SKIP: {STATIC_VIDEO} / {ref_gesture} (file missing)")
-            continue
-        for strat in STRATEGIES:
-            m = score_pair(static_path, ref_path, strat)
-            print_row(STATIC_VIDEO, ref_gesture, strat, m)
-        _real_print(SEP)
+    for static_video in STATIC_VIDEOS:
+        static_path = resolve_recorded(static_video)
+        for ref_gesture in GESTURES:
+            ref_path = resolve_reference(ref_gesture)
+            if not os.path.isfile(static_path) or not os.path.isfile(ref_path):
+                _real_print(f"  SKIP: {static_video} / {ref_gesture} (file missing)")
+                continue
+            for strat in STRATEGIES:
+                m = score_pair(static_path, ref_path, strat)
+                print_row(static_video, ref_gesture, strat, m)
+            _real_print(SEP)
 
     # ── Section 3: Cross-gesture (wrong reference) ──
     print_header("CROSS-GESTURE  (user video vs WRONG reference — should score low)")

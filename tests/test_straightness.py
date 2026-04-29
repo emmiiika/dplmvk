@@ -4,9 +4,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from HandAnnotation import HandAnnotation
 from Scoring import Scoring
 
-ANNOTATED = os.path.abspath("../videa/.annotated")
-RECORDED = os.path.abspath("../videa/.recorded")
-REFERENCE = os.path.abspath("../videa")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ANNOTATED = os.path.join(_SCRIPT_DIR, "../videos/.annotated")
+RECORDED = os.path.join(_SCRIPT_DIR, "../videos/.recorded")
+REFERENCE = os.path.join(_SCRIPT_DIR, "../videos/referenceVideos")
 
 
 def get_ann(video_path):

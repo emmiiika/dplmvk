@@ -5,7 +5,7 @@ from Scoring import Scoring
 
 
 def main():
-    reference_path = "../videa/.annotated/oko - (360p)_annotated_handLandmarks.json"
+    reference_path = "../videos/.annotated/oko - (360p)_annotated_handLandmarks.json"
 
     with open(reference_path, "r") as f:
         reference_seq = json.load(f)

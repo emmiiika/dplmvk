@@ -14,7 +14,7 @@ import cv2
 
 from HandAnnotation import HandAnnotation
 
-REFERENCE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videa"))
+REFERENCE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos", "referenceVideos"))
 RECORDED_DIR = os.path.join(REFERENCE_DIR, ".recorded")
 ANNOTATED_DIR = os.path.join(REFERENCE_DIR, ".annotated")
 

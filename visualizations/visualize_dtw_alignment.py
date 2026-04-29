@@ -26,9 +26,9 @@ from HandAnnotation import HandAnnotation
 from Scoring import Scoring
 from LandmarkIndices import LandmarkIndices
 
-REFERENCE_FOLDER = os.path.join(_CODE_DIR, "../videa")
-ANNOTATED_FOLDER = os.path.join(_CODE_DIR, "../videa/.annotated")
-RECORDED_FOLDER = os.path.join(_CODE_DIR, "../videa/.recorded")
+REFERENCE_FOLDER = os.path.join(_CODE_DIR, "videos/referenceVideos")
+ANNOTATED_FOLDER = os.path.join(_CODE_DIR, "videos/.annotated")
+RECORDED_FOLDER = os.path.join(_CODE_DIR, "videos/.recorded")
 
 
 # ── Annotation loading (same logic as compare_strategies.py) ─────────────────
