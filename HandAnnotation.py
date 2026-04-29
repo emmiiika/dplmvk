@@ -17,6 +17,47 @@ FAIL = "\033[91m"
 ENDC = "\033[0m"
 
 
+class LatchFilter:
+    """Nonlinear latching filter for MediaPipe landmark stabilization.
+
+    Based on Nieveen et al.: "A nonlinear latching filter to remove jitter from
+    movement estimates for prostheses" (2020), as used in LandmarksStabilizationCam.
+
+    For each coordinate independently, computes a blend factor:
+        alpha = min(1, beta * dx²)
+    where dx = new - prev_estimate.  Small displacements yield alpha≈0 (output stays
+    near previous estimate); large displacements yield alpha≈1 (output follows input).
+    A secondary dead-zone gate (threshold) suppresses any remaining change smaller
+    than *threshold* per coordinate.
+
+    Args:
+        beta: Quadratic scaling factor controlling the transition speed.
+              Higher values → sharper transition (less smoothing).
+              Default 1000 is tuned for wrist-centered normalized hand space.
+        threshold: Per-coordinate dead-zone below which the output is held fixed.
+    """
+
+    def __init__(self, beta: float = 49000.0, threshold: float = 0.001):
+        self.beta = beta
+        self.threshold = threshold
+        self._last: np.ndarray | None = None
+
+    def reset(self):
+        """Clear stored state (call between independent recording sessions)."""
+        self._last = None
+
+    def __call__(self, landmarks: np.ndarray) -> np.ndarray:
+        if self._last is None:
+            self._last = landmarks.copy()
+            return landmarks
+        dx = landmarks - self._last  # (21, 3) per-coordinate displacement
+        alpha = np.minimum(1.0, self.beta * np.square(dx))  # nonlinear blend factor ∈ [0, 1]
+        x_hat = alpha * landmarks + (1.0 - alpha) * self._last  # weighted blend
+        x_hat = np.where(np.abs(dx) < self.threshold, self._last, x_hat)  # dead-zone gate
+        self._last = x_hat.copy()
+        return x_hat.copy()
+
+
 class HandAnnotation:
     """Handles hand landmark detection, visualization, and video recording using MediaPipe and OpenCV."""
 
@@ -28,12 +69,13 @@ class HandAnnotation:
     TRIM_PADDING_SECONDS = 0.25  # seconds of padding kept before/after active hand region
     MOVEMENT_THRESHOLD = 0.01  # mean landmark displacement (normalised 0-1 image coords) to count as movement
 
-    def __init__(self, videoInput):
+    def __init__(self, videoInput, useLatchFilter=True):
         """
         Initialize the hand detector and video writer.
 
         Args:
             videoInput: OpenCV VideoCapture object for accessing the video feed.
+            useLatchFilter: If True, apply the LatchFilter to normalized landmarks to suppress jitter.
 
         Note:
             This creates an 'output.mp4' file in the current directory for recording.
@@ -62,6 +104,9 @@ class HandAnnotation:
         self.handLandmarksTimestamped = []  # Store timestamped hand landmarks
         self.wristTrajectoryList = []  # Store original wrist positions for each hand and frame
         self.currentWristPositions = []  # Original wrist [x,y,z] per hand for the latest frame
+        self._latchFilters = [LatchFilter(), LatchFilter()]  # One jitter filter per hand slot (Left, Right)
+        self._wristLatchFilters = [LatchFilter(), LatchFilter()]  # One wrist jitter filter per hand slot
+        self.useLatchFilter = useLatchFilter
 
     # ------------------------------------------------------------------
     # Landmark processing helpers
@@ -164,11 +209,11 @@ class HandAnnotation:
         # Sort hands by handedness so Left is always index 0, Right always index 1.
         sortedHands = self._sortedHandLandmarks(detectionResult)
 
-        # Store original wrist positions before normalization
+        # Store original wrist positions before normalization (wrist latch filter disabled)
         self.wristTrajectoryList = []
         original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in sortedHands]
         self.currentWristPositions = []
-        for coords in original_coords:
+        for i, coords in enumerate(original_coords):
             if coords.shape[0] > LandmarkIndices.WRIST:
                 wrist = coords[LandmarkIndices.WRIST]
                 self.wristTrajectoryList.append(wrist.tolist())
@@ -180,6 +225,8 @@ class HandAnnotation:
         # Normalize landmarks: translate (wrist-centered) then scale (hand-size invariant)
         translated = [self._getTranslatedLandmarks(hand) for hand in sortedHands]
         normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]
+        if self.useLatchFilter:
+            normalized = [self._latchFilters[i](n) for i, n in enumerate(normalized)]
         self.handLandmarksList = self._landmarksToDict(normalized)
         annotatedImage = np.copy(rgbImage)
 
@@ -242,20 +289,23 @@ class HandAnnotation:
         # Always compute and store normalized landmarks for downstream scoring.
         translated = [self._getTranslatedLandmarks(hand) for hand in sortedHands]
         normalized = [self._getNormalizedScaleLandmarks(trans) for trans in translated]
+        if self.useLatchFilter:
+            normalized = [self._latchFilters[i](n) for i, n in enumerate(normalized)]
         self.handLandmarksList = self._landmarksToDict(normalized)
 
-        # Always update raw wrist positions so scoring has them even when drawing is off.
-        original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in sortedHands]
-        self.currentWristPositions = []
-        for coords in original_coords:
-            if coords.shape[0] > LandmarkIndices.WRIST:
-                self.currentWristPositions.append(coords[LandmarkIndices.WRIST].tolist())
-            else:
-                self.currentWristPositions.append(None)
-
         if drawAnnotations:
+            # drawLandmarksOnImage sets currentWristPositions with wrist filter applied
             outputImage = self.drawLandmarksOnImage(image.numpy_view(), detectionResult)
         else:
+            # Update wrist positions with filter when drawing is off
+            # Wrist latch filter disabled — use raw positions
+            original_coords = [np.array([[lm.x, lm.y, lm.z] for lm in hand]) for hand in sortedHands]
+            self.currentWristPositions = []
+            for coords in original_coords:
+                if coords.shape[0] > LandmarkIndices.WRIST:
+                    self.currentWristPositions.append(coords[LandmarkIndices.WRIST].tolist())
+                else:
+                    self.currentWristPositions.append(None)
             outputImage = image.numpy_view()
 
         if returnQt:
@@ -431,6 +481,8 @@ class HandAnnotation:
 
         framesProcessed = 0
         self.handLandmarksTimestamped = []  # Reset for new video
+        for f in self._latchFilters + self._wristLatchFilters:  # Reset jitter filters for clean start
+            f.reset()
         nextSampleTime = 0.0
         frameIdx = 0
         landmarksPerFrame = []  # collected for trim marker computation after the loop
