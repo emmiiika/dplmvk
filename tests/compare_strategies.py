@@ -13,7 +13,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from HandAnnotation import HandAnnotation
 from Scoring import Scoring, SCORING_STRATEGIES
 
-
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 REFERENCE_FOLDER = os.path.join(_SCRIPT_DIR, "../videos/referenceVideos")
@@ -139,10 +138,14 @@ def score_pair(user_path, ref_path, strategy_name):
     user_seq = user_ann.handLandmarksTimestamped
     ref_seq = ref_ann.handLandmarksTimestamped
 
-    # Calculate the main score using the unified scoring logic
-    score = scorer.calculateScore(
+    # Calculate scores with and without wrist trajectory
+    score_with_wrist = scorer.calculateScore(
         userLandmarks=user_seq, includeWristTrajectory=INCLUDE_WRIST_TRAJECTORY, wristWeight=WRIST_WEIGHT
     )
+    score_hand_only = scorer.calculateScore(userLandmarks=user_seq, includeWristTrajectory=False, wristWeight=0)
+
+    # Wrist contribution (the blended amount)
+    wrist_contribution = score_with_wrist - score_hand_only
 
     # For reporting, extract additional metrics (DTW, Euclidean, Cosine, activity, wrist displacement)
     # These are for diagnostics only and do not affect the main score
@@ -155,6 +158,10 @@ def score_pair(user_path, ref_path, strategy_name):
     aligned_ref = [ref_frames[j] for (i, j) in warping_path]
     eucl_dist = scorer._averageEuclideanDistance(aligned_user, aligned_ref, hand_weights)
     cos_sim = scorer._averageCosineSimilarity(aligned_user, aligned_ref, hand_weights)
+
+    # Compute the actual similarities that contribute to the final score
+    eucl_sim = scorer._distanceToSimilarity(eucl_dist, scorer.strategy["euclideanMaxDistance"])
+
     ref_energy = scorer._averageMotionEnergy(ref_frames, hand_weights)
     user_energy = scorer._averageMotionEnergy(user_frames, hand_weights)
     activity = 1.0
@@ -167,12 +174,33 @@ def score_pair(user_path, ref_path, strategy_name):
     ref_max_disp = scorer._wristMaxDispFromRawSeq(raw_ref, hand_weights)
     user_max_disp = scorer._wristMaxDispFromRawSeq(raw_user, hand_weights)
 
+    # Compute wrist displacement factor
+    displacement_factor = 1.0
+    if ref_max_disp is not None and user_max_disp is not None:
+        displacement_factor = min(1.0, user_max_disp / ref_max_disp)
+
+    # Compute weighted contributions
+    eucl_weight = scorer.strategy["euclideanWeight"]
+    cos_weight = scorer.strategy["cosineWeight"]
+    eucl_contrib = eucl_weight * eucl_sim
+    cos_contrib = cos_weight * cos_sim
+    combined_before_penalties = eucl_contrib + cos_contrib
+    final_combined = combined_before_penalties * activity * displacement_factor
+
     return {
-        "score": score,
+        "score": score_with_wrist,
+        "hand_score": score_hand_only,
+        "wrist_contrib": wrist_contribution,
         "dtw_dist": dtw_dist,
         "eucl_dist": eucl_dist,
+        "eucl_sim": eucl_sim,
         "cos_sim": cos_sim,
+        "eucl_contrib": eucl_contrib,
+        "cos_contrib": cos_contrib,
+        "combined_raw": combined_before_penalties,
         "activity": activity,
+        "displacement": displacement_factor,
+        "final_combined": final_combined,
         "u_frames": len(user_frames),
         "r_frames": len(ref_frames),
         "wrist_user": user_max_disp if user_max_disp is not None else 0.0,
@@ -184,18 +212,18 @@ def score_pair(user_path, ref_path, strategy_name):
 
 STRATEGIES = list(SCORING_STRATEGIES.keys())
 
-SEP = "-" * 152
+SEP = "-" * 175
 
 
 def print_header(title):
-    print(f"\n{'=' * 152}")
+    print(f"\n{'=' * 175}")
     print(f"  {title}")
-    print(f"{'=' * 152}")
+    print(f"{'=' * 175}")
 
 
 def print_table_header():
     print(
-        f"{'User Video':<20} {'Reference':<12} {'Strategy':<20} {'Score%':>7} {'DTW dist':>9} {'Eucl dist':>10} {'Cos sim':>8} {'Activity':>9} {'W.usr':>6} {'W.ref':>6} {'Frames':>10}"
+        f"{'User Video':<20} {'Reference':<12} {'Strategy':<20} {'Score%':>7} {'DTW dist':>9} {'Eucl dist':>10} {'Eucl sim':>9} {'Cos sim':>8} {'E.contrib':>9} {'C.contrib':>9} {'Combined':>9} {'Activity':>9} {'Displ':>6} {'Hand':>6} {'Wrist':>6} {'Frames':>10}"
     )
     print(SEP)
 
@@ -203,7 +231,7 @@ def print_table_header():
 def print_row(user_stem, ref_gesture, strategy, m):
     frames_str = f"{m['u_frames']}/{m['r_frames']}"
     print(
-        f"{user_stem:<20} {ref_gesture:<12} {strategy:<20} {m['score']*100:6.1f}% {m['dtw_dist']:9.4f} {m['eucl_dist']:10.4f} {m['cos_sim']:8.4f} {m['activity']:9.3f} {m['wrist_user']:6.3f} {m['wrist_ref']:6.3f} {frames_str:>10}"
+        f"{user_stem:<20} {ref_gesture:<12} {strategy:<20} {m['score']*100:6.1f}% {m['dtw_dist']:9.4f} {m['eucl_dist']:10.4f} {m['eucl_sim']:9.4f} {m['cos_sim']:8.4f} {m['eucl_contrib']:9.4f} {m['cos_contrib']:9.4f} {m['combined_raw']:9.4f} {m['activity']:9.3f} {m['displacement']:6.3f} {m['hand_score']:6.3f} {m['wrist_contrib']:6.3f} {frames_str:>10}"
     )
 
 

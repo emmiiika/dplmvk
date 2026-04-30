@@ -1,7 +1,6 @@
 import numpy as np
 import math
 
-
 # Scoring strategy presets — change the strategy name to switch behaviour.
 # Each strategy defines the tunable calibration parameters.
 # This is not a part of the aplication itself, it exists just to experiment with
@@ -37,7 +36,7 @@ SCORING_STRATEGIES = {
         "cosineWeight": 0.82,
         "activityThreshold": 0.35,
     },
-    "strict_euclidean": {
+    "strict_distances": {
         "euclideanMaxDistance": 0.5,
         "euclideanWeight": 0.22,
         "cosineWeight": 0.78,
