@@ -30,6 +30,20 @@ REFERENCE_FOLDER = os.path.join(_CODE_DIR, "videos/referenceVideos")
 ANNOTATED_FOLDER = os.path.join(_CODE_DIR, "videos/.annotated")
 RECORDED_FOLDER = os.path.join(_CODE_DIR, "videos/.recorded")
 
+# Short gesture name → actual reference video filename stem.
+# Mirrors compare_strategies.py so output names stay short ("..._vs_oko.png").
+REFERENCE_FILENAMES = {
+    "oko": "oko_right",
+    "oko_left": "oko_left",
+    "oko_side": "oko_right_side",
+    "dom": "dom_both",
+    "slovo": "slovo_right",
+    "hrad": "hrad_both",
+    "hrad_side": "hrad_both_side",
+    "pes": "pes_both",
+    "pes_side": "pes_both_side",
+}
+
 
 # ── Annotation loading (same logic as compare_strategies.py) ─────────────────
 
@@ -143,10 +157,11 @@ def per_frame_cosine(scorer, aligned_user, aligned_ref, hand_weights):
 
 
 def visualize(user_stem, ref_gesture):
-    return visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix="wrist_off")
+    # Match compare_strategies.py defaults so the printed score equals the txt's Score% column.
+    return visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=True, wristWeight=0.1)
 
 
-def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False, output_suffix=None):
+def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=True, wristWeight=0.1, output_suffix=None):
     for ext in (".mp4", ".avi"):
         candidate = os.path.abspath(os.path.join(RECORDED_FOLDER, f"{user_stem}{ext}"))
         if os.path.isfile(candidate):
@@ -154,7 +169,8 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
             break
     else:
         user_path = os.path.abspath(os.path.join(RECORDED_FOLDER, f"{user_stem}.mp4"))
-    ref_path = os.path.abspath(os.path.join(REFERENCE_FOLDER, f"{ref_gesture}.mp4"))
+    ref_filename = REFERENCE_FILENAMES.get(ref_gesture, ref_gesture)
+    ref_path = os.path.abspath(os.path.join(REFERENCE_FOLDER, f"{ref_filename}.mp4"))
 
     print(f"Loading user:      {user_path}")
     user_ann = load_annotation(user_path)
@@ -178,6 +194,7 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     score = scorer.calculateScore(
         userLandmarks=user_ann.handLandmarksTimestamped,
         includeWristTrajectory=includeWristTrajectory,
+        wristWeight=wristWeight,
     )
     score_pct = score * 100
     print(f"Score: {score_pct:.1f}%")
@@ -216,7 +233,13 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ref_wx2 = [w[wrist_hand_idx2][0] for w in raw_ref_wrists if w[wrist_hand_idx2] is not None]
     ref_wy2 = [w[wrist_hand_idx2][1] for w in raw_ref_wrists if w[wrist_hand_idx2] is not None]
 
-    # Wrist max displacement (user vs reference, dominant hand)
+    # Wrist max displacement (per hand and weighted-combined across both hands)
+    def _per_hand_disp(raw_seq, idx):
+        traj = [pair[idx] for pair in raw_seq]
+        return scorer._wristMaxDisplacement(traj)
+
+    user_disp_per_hand = [_per_hand_disp(raw_user_wrists, i) for i in (0, 1)]
+    ref_disp_per_hand = [_per_hand_disp(raw_ref_wrists, i) for i in (0, 1)]
     user_wrist_disp = scorer._wristMaxDispFromRawSeq(raw_user_wrists, hand_weights)
     ref_wrist_disp = scorer._wristMaxDispFromRawSeq(raw_ref_wrists, hand_weights)
 
@@ -270,6 +293,12 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
         return 0.6 * dtw_sim + 0.4 * eucl_sim
 
     wrist_score = _wrist_score(raw_user_wrists, raw_ref_wrists, hand_weights)
+    # Per-hand wrist scores: rerun the whole pipeline restricted to one hand
+    # (DTW path is recomputed for each hand — not a separable intermediate).
+    wrist_score_per_hand = [
+        _wrist_score(raw_user_wrists, raw_ref_wrists, [1.0, 0.0]),
+        _wrist_score(raw_user_wrists, raw_ref_wrists, [0.0, 1.0]),
+    ]
 
     # Euclidean similarity (converted from mean frame distance)
     euclid_sim = scorer._distanceToSimilarity(
@@ -280,12 +309,25 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     cosine_sim = float(np.mean(cosine_curve))
 
     # ── Plot ──────────────────────────────────────────────────────────────────
+    # Sized for A4 print: ~2× default font sizes so text stays legible after scaling.
+    plt.rcParams.update(
+        {
+            "axes.titlesize": 18,
+            "axes.labelsize": 15,
+            "xtick.labelsize": 13,
+            "ytick.labelsize": 13,
+            "legend.fontsize": 13,
+        }
+    )
     fig = plt.figure(figsize=(16, 18))
     fig.suptitle(
         f"DTW Alignment: '{user_stem}'  vs  '{ref_gesture}' reference    |    Score: {score_pct:.1f}%",
-        fontsize=14,
+        fontsize=22,
+        fontweight="bold",
     )
-    gs = gridspec.GridSpec(4, 2, figure=fig, hspace=0.55, wspace=0.35, height_ratios=[1, 1, 1, 1])
+    # Row 3 is an empty spacer that holds the per-hand wrist info boxes and
+    # the combined wrist score banner — keeps them out of the wrist plots.
+    gs = gridspec.GridSpec(5, 2, figure=fig, hspace=0.55, wspace=0.35, height_ratios=[1, 1, 1, 0.5, 1])
 
     # 1. DTW cost matrix with alignment path (spans top 2 rows, left column)
     ax_dtw = fig.add_subplot(gs[0:2, 0])
@@ -296,7 +338,7 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_dtw.set_xlabel("Reference frame index")
     ax_dtw.set_ylabel("User frame index")
     ax_dtw.set_title("DTW Cost Matrix & Alignment Path")
-    ax_dtw.legend(loc="upper left", fontsize=8)
+    ax_dtw.legend(loc="upper left")
     plt.colorbar(im, ax=ax_dtw, fraction=0.046, pad=0.04)
     ax_dtw.text(
         0.98,
@@ -305,10 +347,10 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
         transform=ax_dtw.transAxes,
         ha="right",
         va="bottom",
-        fontsize=12,
+        fontsize=18,
         fontweight="bold",
         color="white",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="#333333", alpha=0.8),
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="#333333", alpha=0.65),
     )
 
     # 2a. Index fingertip X trajectory with DTW correspondences
@@ -325,9 +367,9 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
                 arrowprops=dict(arrowstyle="-", color="gray", alpha=0.3, lw=0.8),
             )
     ax_x.set_xlabel("Frame index")
-    ax_x.set_ylabel("X coordinate (normalized)")
+    ax_x.set_ylabel("X coordinate\n(normalized)")
     ax_x.set_title(f"Index Fingertip X + DTW Correspondences (lm {LANDMARK})")
-    ax_x.legend(fontsize=8)
+    ax_x.legend()
 
     # 2b. Index fingertip Y trajectory with DTW correspondences
     ax_y = fig.add_subplot(gs[1, 1])
@@ -343,9 +385,9 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
             )
     ax_y.invert_yaxis()  # normalized y=0 is top of frame
     ax_y.set_xlabel("Frame index")
-    ax_y.set_ylabel("Y coordinate (normalized, inverted)")
+    ax_y.set_ylabel("Y coordinate\n(normalized, inverted)")
     ax_y.set_title(f"Index Fingertip Y + DTW Correspondences (lm {LANDMARK})")
-    ax_y.legend(fontsize=8)
+    ax_y.legend()
 
     # 3. Wrist 2D trajectory (dominant hand, raw screen-space x/y)
     hand1_label = "Left" if wrist_hand_idx == 0 else "Right"
@@ -362,21 +404,18 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_wrist.set_xlabel("X (screen)")
     ax_wrist.set_ylabel("Y (screen, inverted)")
     ax_wrist.set_title(f"Wrist 2D Trajectory (hand {wrist_hand_idx} — {hand1_label}, ○=start ■=end)")
-    ax_wrist.legend(fontsize=8)
+    ax_wrist.legend()
     ax_wrist.set_aspect("equal", adjustable="datalim")
-    _u = f"{user_wrist_disp:.3f}" if user_wrist_disp is not None else "N/A"
-    _r = f"{ref_wrist_disp:.3f}" if ref_wrist_disp is not None else "N/A"
-    _ws = f"{wrist_score * 100:.1f}%" if wrist_score is not None else "N/A"
-    ax_wrist.text(
-        0.02,
-        0.02,
-        f"max disp — user: {_u}  ref: {_r}\nwrist score: {_ws}",
-        transform=ax_wrist.transAxes,
-        ha="left",
-        va="bottom",
-        fontsize=9,
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.85),
-    )
+
+    def _disp_str(v):
+        return f"{v:.3f}" if v is not None else "N/A"
+
+    def _score_str(v):
+        return f"{v * 100:.1f}%" if v is not None else "N/A"
+
+    _u = _disp_str(user_disp_per_hand[wrist_hand_idx])
+    _r = _disp_str(ref_disp_per_hand[wrist_hand_idx])
+    _ws = _score_str(wrist_score_per_hand[wrist_hand_idx])
 
     # 3b. Wrist 2D trajectory (other hand)
     ax_wrist2 = fig.add_subplot(gs[2, 1])
@@ -397,18 +436,56 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
             transform=ax_wrist2.transAxes,
             ha="center",
             va="center",
-            fontsize=10,
+            fontsize=15,
             color="gray",
         )
     ax_wrist2.invert_yaxis()
     ax_wrist2.set_xlabel("X (screen)")
     ax_wrist2.set_ylabel("Y (screen, inverted)")
     ax_wrist2.set_title(f"Wrist 2D Trajectory (hand {wrist_hand_idx2} — {hand2_label}, ○=start ■=end)")
-    ax_wrist2.legend(fontsize=8)
+    ax_wrist2.legend()
     ax_wrist2.set_aspect("equal", adjustable="datalim")
+    _u2 = _disp_str(user_disp_per_hand[wrist_hand_idx2])
+    _r2 = _disp_str(ref_disp_per_hand[wrist_hand_idx2])
+    _ws2 = _score_str(wrist_score_per_hand[wrist_hand_idx2])
+
+    # Per-hand info boxes and combined banner sit in the spacer row below the wrist plots.
+    pos_left = ax_wrist.get_position()
+    pos_right = ax_wrist2.get_position()
+    info_y = pos_left.y0 - 0.045
+    fig.text(
+        (pos_left.x0 + pos_left.x1) / 2,
+        info_y,
+        f"max disp — user: {_u}  ref: {_r}\nwrist score: {_ws}",
+        ha="center",
+        va="top",
+        fontsize=14,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="lightyellow", alpha=0.7),
+    )
+    fig.text(
+        (pos_right.x0 + pos_right.x1) / 2,
+        info_y,
+        f"max disp — user: {_u2}  ref: {_r2}\nwrist score: {_ws2}",
+        ha="center",
+        va="top",
+        fontsize=14,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="lightyellow", alpha=0.7),
+    )
+    fig.text(
+        (pos_left.x0 + pos_right.x1) / 2,
+        info_y - 0.060,
+        f"Combined wrist score (both hands): {_score_str(wrist_score)}",
+        ha="center",
+        va="top",
+        fontsize=18,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.7", facecolor="lightyellow", edgecolor="goldenrod", linewidth=1.5, alpha=0.7),
+    )
 
     # 4. Per-frame Euclidean distance (DTW-aligned)
-    ax_euclid = fig.add_subplot(gs[3, 0])
+    ax_euclid = fig.add_subplot(gs[4, 0])
     ax_euclid.plot(euclid_curve, color="mediumseagreen")
     ax_euclid.axhline(
         np.mean(euclid_curve), color="darkgreen", linestyle="--", linewidth=1, label=f"mean={np.mean(euclid_curve):.3f}"
@@ -416,7 +493,7 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_euclid.set_xlabel("Aligned frame index")
     ax_euclid.set_ylabel("Weighted distance")
     ax_euclid.set_title("Per-Frame Euclidean Distance (aligned)")
-    ax_euclid.legend(fontsize=8)
+    ax_euclid.legend()
     ax_euclid.text(
         0.98,
         0.98,
@@ -424,13 +501,13 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
         transform=ax_euclid.transAxes,
         ha="right",
         va="top",
-        fontsize=10,
+        fontsize=16,
         fontweight="bold",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="honeydew", alpha=0.9),
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="honeydew", alpha=0.65),
     )
 
     # 5. Per-frame Cosine similarity (DTW-aligned)
-    ax_cos = fig.add_subplot(gs[3, 1])
+    ax_cos = fig.add_subplot(gs[4, 1])
     ax_cos.plot(cosine_curve, color="coral")
     ax_cos.axhline(
         np.mean(cosine_curve), color="darkred", linestyle="--", linewidth=1, label=f"mean={np.mean(cosine_curve):.3f}"
@@ -439,22 +516,22 @@ def visualize_with_options(user_stem, ref_gesture, includeWristTrajectory=False,
     ax_cos.set_xlabel("Aligned frame index")
     ax_cos.set_ylabel("Cosine similarity (0–1)")
     ax_cos.set_title("Per-Frame Cosine Similarity (aligned)")
-    ax_cos.legend(fontsize=8)
+    ax_cos.legend()
     ax_cos.text(
         0.98,
-        0.98,
+        0.02,
         f"Cos sim: {cosine_sim * 100:.1f}%",
         transform=ax_cos.transAxes,
         ha="right",
-        va="top",
-        fontsize=10,
+        va="bottom",
+        fontsize=16,
         fontweight="bold",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="mistyrose", alpha=0.9),
+        bbox=dict(boxstyle="round,pad=0.6", facecolor="mistyrose", alpha=0.65),
     )
 
     suffix = f"_{output_suffix}" if output_suffix else ""
     out_path = os.path.join(_SCRIPT_DIR, f"dtw_alignment_{user_stem}_vs_{ref_gesture}{suffix}.png")
-    plt.savefig(out_path, dpi=130, bbox_inches="tight")
+    plt.savefig(out_path, dpi=200, bbox_inches="tight")
     print(f"Saved: {out_path}")
     plt.close("all")
 
