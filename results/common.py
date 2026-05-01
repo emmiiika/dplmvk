@@ -14,7 +14,7 @@ STRATEGIES_ORDER = [
     "lower_activity",
     "cosine_heavy",
     "all_combined",
-    "strict_distance",
+    "strict_distances",
     "euclid_heavy",
 ]
 
@@ -22,9 +22,9 @@ STRATEGIES_ORDER = [
 # Hard-coded because the file format is stable: header line, separator,
 # data rows, then the next section header. End=None means "to EOF".
 SECTION_BOUNDS = {
-    "MATCHING": (3, 137),
-    "NON-GESTURE": (137, 359),
-    "CROSS": (359, None),
+    "MATCHING": (3, 139),
+    "NON-GESTURE": (139, 363),
+    "CROSS": (363, None),
 }
 
 # Match a data row: user_video, reference, strategy, score%.
